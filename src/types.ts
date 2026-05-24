@@ -12,6 +12,7 @@ export type ConditionCategory =
   | 'cooling'
   | 'neutralization'
   | 'evacuation'
+  | 'resource'
   | 'other';
 
 export type Confidence = 'official' | 'attributed_to_official' | 'media_reported' | 'unconfirmed';
@@ -46,11 +47,46 @@ export type SourceHealth = {
 
 export type TankTemperatureStatus = {
   value?: number;
-  units?: 'F' | 'C';
+  units?: 'F' | 'C' | 'unknown';
   trend?: 'rising' | 'falling' | 'stable' | 'unknown';
   sourceName: string;
   sourcePublishedAt?: string;
   confidence: Confidence | string;
+};
+
+export type ResourceLink = {
+  label: string;
+  url: string;
+  note?: string;
+};
+
+export type Hotline = {
+  label: string;
+  value: string;
+  note?: string;
+};
+
+export type EvacuationResources = {
+  status: string;
+  incidentSite: string;
+  evacuationZone: string[];
+  affectedCities: string[];
+  timeline: string[];
+  hotlines: Hotline[];
+  officialLinks: ResourceLink[];
+  shelterLinks: ResourceLink[];
+  hotelLinks: ResourceLink[];
+  languages: string[];
+  notes: string[];
+};
+
+export type SourceFreshness = {
+  latestOfficialTextUpdate?: string;
+  latestOfficialVideoUpdate?: string;
+  latestMediaPhysicalUpdate?: string;
+  latestMonitorCapture?: string;
+  telemetryStatus: string;
+  freshnessWarning?: string;
 };
 
 export type CurrentStatus = {
@@ -65,6 +101,8 @@ export type CurrentStatus = {
   overallStatus?: string;
   confidence?: Confidence | string;
   physicalSituationSummary: string;
+  resources?: EvacuationResources;
+  sourceFreshness?: SourceFreshness;
   newestEvents: HazmatEvent[];
   sourceHealth: SourceHealth[];
 };
