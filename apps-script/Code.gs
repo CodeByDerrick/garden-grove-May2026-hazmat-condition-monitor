@@ -26,7 +26,7 @@ var SOURCES = [
 var CONDITION_RULES = [
   {
     category: 'tank_temperature', severity: 'watch', priority: 10,
-    pattern: new RegExp('\\b(?:tank|chemical|liquid|methyl methacrylate|mma|temperature)\\b.{0,160}\\b(\\d{2,3})\\s?(?:°?\\s?F|degrees?(?:\\s+Fahrenheit)?)\\b', 'i'),
+    pattern: new RegExp('\\b(?:tank|chemical|liquid|methyl methacrylate|mma|temperature)\\b.{0,160}\\b(\\d{1,3})\\s?(?:°?\\s?(F|C)|degrees?(?:\\s+(Fahrenheit|Celsius))?)\\b', 'i'),
     summary: 'Captured tank-temperature-related value from nearby tank/chemical context.'
   },
   {
@@ -150,7 +150,7 @@ function parseSource(source, text, observedAt, sourcePublishedAt) {
     if (isWeakMatch(rule.category, excerpt)) continue;
 
     var value = rule.category === 'tank_temperature' && match[1] ? Number(match[1]) : '';
-    var units = rule.category === 'tank_temperature' ? 'F' : '';
+    var units = rule.category === 'tank_temperature' ? inferTemperatureUnit(match, excerpt, source) : '';
     var summary = summarizeMatch(rule, match[0], source.name, value, units, excerpt);
     var hash = digest(source.id + '|' + rule.category + '|' + summary + '|' + excerpt);
 
@@ -178,6 +178,15 @@ function parseSource(source, text, observedAt, sourcePublishedAt) {
   return events;
 }
 
+function inferTemperatureUnit(match, excerpt, source) {
+  var matchedText = String(match[0] || '').toLowerCase();
+  var context = String(excerpt || '').toLowerCase();
+  if (matchedText.indexOf('celsius') !== -1 || matchedText.indexOf('°c') !== -1 || matchedText.match(/\bc\b/)) return 'C';
+  if (matchedText.indexOf('fahrenheit') !== -1 || matchedText.indexOf('°f') !== -1 || matchedText.match(/\bf\b/)) return 'F';
+  if (context.indexOf('fahrenheit') !== -1 || context.indexOf('flashpoint is 50 fahrenheit') !== -1 || source.id === 'ap-summary') return 'F';
+  return 'unknown';
+}
+
 function isWeakMatch(category, excerpt) {
   var lower = String(excerpt || '').toLowerCase();
   if (category === 'cooling' && lower.indexOf('water') !== -1 && lower.indexOf('cool') === -1 && lower.indexOf('tank') === -1) return true;
@@ -189,7 +198,8 @@ function isWeakMatch(category, excerpt) {
 function summarizeMatch(rule, matchedText, sourceName, value, units, excerpt) {
   var cleaned = String(matchedText).replace(new RegExp('\\s+', 'g'), ' ').trim();
   if (rule.category === 'tank_temperature') {
-    return sourceName + ' reports a tank-temperature-related value of ' + value + '°' + units + '.';
+    var unitLabel = units === 'unknown' || !units ? 'unknown unit' : '°' + units;
+    return sourceName + ' reports a tank-temperature-related value of ' + value + unitLabel + '.';
   }
   if (rule.category === 'temperature_trend') {
     return sourceName + ' reports temperature-trend language: ' + cleaned + '.';
@@ -282,7 +292,7 @@ function buildCurrentStatus() {
     lastPhysicalUpdateAt: lastPhysical ? lastPhysical.observedAt : '',
     tankTemperature: latestTemperature ? {
       value: Number(latestTemperature.value) || undefined,
-      units: latestTemperature.units || 'F',
+      units: latestTemperature.units || 'unknown',
       trend: inferTrend(latestTrend ? latestTrend.summary + ' ' + latestTrend.excerpt : ''),
       sourceName: latestTemperature.sourceName,
       sourcePublishedAt: latestTemperature.sourcePublishedAt,
