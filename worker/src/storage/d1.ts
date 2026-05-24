@@ -23,6 +23,20 @@ export type WorkerEnv = {
   DB?: D1DatabaseBinding;
 };
 
+export type DbHealth = {
+  ok: boolean;
+  database: 'available' | 'unavailable';
+  checkedAt: string;
+  error?: string;
+};
+
+export type UsageCounter = {
+  metric: string;
+  bucketStart: string;
+  count: number;
+  updatedAt: string;
+};
+
 export type StoredHazmatEvent = {
   id: string;
   observedAt: string;
@@ -126,6 +140,17 @@ type ManualOverrideRow = {
   updated_at: string;
 };
 
+type UsageCounterRow = {
+  metric: string;
+  bucket_start: string;
+  count: number;
+  updated_at: string;
+};
+
+type HealthCheckRow = {
+  ok: number;
+};
+
 function requireDb(env: WorkerEnv): D1DatabaseBinding {
   if (!env.DB) {
     throw new Error('D1 binding DB is not configured.');
@@ -171,6 +196,52 @@ function mapEventRow(row: EventRow): StoredHazmatEvent {
   };
 }
 
+function mapUsageCounterRow(row: UsageCounterRow): UsageCounter {
+  return {
+    metric: row.metric,
+    bucketStart: row.bucket_start,
+    count: row.count,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function getTodayBucketStart(): string {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString();
+}
+
+export async function checkDbHealth(env: WorkerEnv): Promise<DbHealth> {
+  const checkedAt = new Date().toISOString();
+
+  if (!env.DB) {
+    return {
+      ok: false,
+      database: 'unavailable',
+      checkedAt,
+      error: 'D1 binding DB is not configured.',
+    };
+  }
+
+  try {
+    const result = await env.DB.prepare('SELECT 1 AS ok').all<HealthCheckRow>();
+    const ok = result.results?.[0]?.ok === 1;
+
+    return {
+      ok,
+      database: ok ? 'available' : 'unavailable',
+      checkedAt,
+      ...(ok ? {} : { error: 'D1 health query did not return the expected result.' }),
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      database: 'unavailable',
+      checkedAt,
+      error: error instanceof Error ? error.message : 'Unknown D1 health check error.',
+    };
+  }
+}
+
 export async function listRecentEvents(env: WorkerEnv, limit = 50): Promise<StoredHazmatEvent[]> {
   const db = requireDb(env);
   const result = await db
@@ -186,6 +257,61 @@ export async function listRecentEvents(env: WorkerEnv, limit = 50): Promise<Stor
     .all<EventRow>();
 
   return (result.results ?? []).map(mapEventRow);
+}
+
+export async function incrementUsageCounter(
+  env: WorkerEnv,
+  metric: string,
+  amount = 1,
+): Promise<UsageCounter> {
+  const db = requireDb(env);
+  const bucketStart = getTodayBucketStart();
+  const updatedAt = new Date().toISOString();
+  const incrementBy = Math.max(1, Math.floor(amount));
+
+  await db
+    .prepare(
+      `INSERT INTO usage_counters (metric, bucket_start, count, updated_at)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(metric, bucket_start) DO UPDATE SET
+         count = count + excluded.count,
+         updated_at = excluded.updated_at`,
+    )
+    .bind(metric, bucketStart, incrementBy, updatedAt)
+    .run();
+
+  const result = await db
+    .prepare(
+      `SELECT metric, bucket_start, count, updated_at
+         FROM usage_counters
+        WHERE metric = ?
+          AND bucket_start = ?`,
+    )
+    .bind(metric, bucketStart)
+    .all<UsageCounterRow>();
+
+  const counter = result.results?.[0];
+
+  if (!counter) {
+    throw new Error(`Usage counter was not found after increment: ${metric}`);
+  }
+
+  return mapUsageCounterRow(counter);
+}
+
+export async function listUsageCounters(env: WorkerEnv, bucketStart = getTodayBucketStart()): Promise<UsageCounter[]> {
+  const db = requireDb(env);
+  const result = await db
+    .prepare(
+      `SELECT metric, bucket_start, count, updated_at
+         FROM usage_counters
+        WHERE bucket_start = ?
+        ORDER BY metric ASC`,
+    )
+    .bind(bucketStart)
+    .all<UsageCounterRow>();
+
+  return (result.results ?? []).map(mapUsageCounterRow);
 }
 
 export async function insertEventIfNew(env: WorkerEnv, event: StoredHazmatEvent): Promise<boolean> {

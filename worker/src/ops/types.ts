@@ -17,6 +17,7 @@ export type OpsStatus = {
   environment: OpsEnvironment;
   currentRiskLevel: OpsRiskLevel;
   riskReasons: string[];
+  counterSource: 'd1' | 'mock';
   counters: {
     workerRequests: OpsCounterStatus & { today: number; limit: number };
     scheduledPollRuns: OpsCounterStatus & { today: number; expectedMax: number };
@@ -34,4 +35,10 @@ export type OpsStatus = {
   };
   notes: string[];
   thresholds: Record<string, number>;
+  usageCounters: Array<{
+    metric: string;
+    bucketStart: string;
+    count: number;
+    updatedAt: string;
+  }>;
 };

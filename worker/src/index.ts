@@ -1,5 +1,5 @@
 import { buildOpsStatus, type OpsEnv } from './ops/status';
-import { listRecentEvents, type WorkerEnv } from './storage/d1';
+import { checkDbHealth, incrementUsageCounter, listRecentEvents, type WorkerEnv } from './storage/d1';
 
 type SourceTier = 'official' | 'media_live' | 'wire' | 'social' | 'manual';
 type Confidence = 'official' | 'attributed_to_official' | 'media_reported' | 'unconfirmed';
@@ -94,6 +94,10 @@ const jsonHeaders = {
   'content-type': 'application/json; charset=utf-8',
   'cache-control': 'no-store',
 };
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'Unknown error';
+}
 
 function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
   return new Response(JSON.stringify(body, null, 2), {
@@ -219,19 +223,41 @@ export default {
   async fetch(request: Request, env: WorkerEnv & OpsEnv): Promise<Response> {
     const url = new URL(request.url);
 
-    if (request.method !== 'GET') {
-      return jsonResponse({ error: 'Method not allowed' }, { status: 405 });
-    }
-
-    if (url.pathname === '/api/health') {
+    if (request.method === 'GET' && url.pathname === '/api/health') {
       return jsonResponse({ ok: true, service: SERVICE_NAME });
     }
 
-    if (url.pathname === '/api/ops/status') {
-      return jsonResponse(buildOpsStatus(env, request));
+    if (request.method === 'GET' && url.pathname === '/api/db/health') {
+      const health = await checkDbHealth(env);
+      return jsonResponse(health, { status: health.ok ? 200 : 503 });
     }
 
-    if (url.pathname === '/api/status') {
+    if (request.method === 'POST' && url.pathname === '/api/ops/smoke-counter') {
+      try {
+        const counter = await incrementUsageCounter(env, 'smoke_test_counter');
+        return jsonResponse({
+          ok: true,
+          metric: counter.metric,
+          bucketStart: counter.bucketStart,
+          count: counter.count,
+          updatedAt: counter.updatedAt,
+        });
+      } catch (error) {
+        return jsonResponse(
+          {
+            ok: false,
+            error: errorMessage(error),
+          },
+          { status: 503 },
+        );
+      }
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/ops/status') {
+      return jsonResponse(await buildOpsStatus(env, request));
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/status') {
       const status = buildMockStatus();
 
       try {
@@ -247,8 +273,12 @@ export default {
       return jsonResponse(status);
     }
 
-    if (url.pathname === '/api/events') {
+    if (request.method === 'GET' && url.pathname === '/api/events') {
       return jsonResponse(await getEvents(env));
+    }
+
+    if (!['GET', 'POST'].includes(request.method)) {
+      return jsonResponse({ error: 'Method not allowed' }, { status: 405 });
     }
 
     return jsonResponse({ error: 'Not found' }, { status: 404 });

@@ -10,6 +10,8 @@ This slice serves mock JSON and includes the first D1 storage scaffold. It does 
 - `GET /api/status` returns a mock `CurrentStatus`-shaped object.
 - `GET /api/events` reads recent D1 events when the `DB` binding is available and falls back to mock `HazmatEvent`-like objects otherwise.
 - `GET /api/ops/status` returns mock operator status and quota guardrail data.
+- `GET /api/db/health` checks that the D1 binding can run a lightweight query.
+- `POST /api/ops/smoke-counter` increments a safe D1 usage counter for operator smoke testing.
 
 ## Local Development
 
@@ -30,6 +32,30 @@ Then open:
 - `http://localhost:8787/api/health`
 - `http://localhost:8787/api/status`
 - `http://localhost:8787/api/events`
+- `http://localhost:8787/api/db/health`
+- `http://localhost:8787/api/ops/status`
+
+## D1 Smoke Test
+
+After local migrations are applied and `npm run worker:dev` is running, verify the D1 binding:
+
+```powershell
+Invoke-RestMethod http://localhost:8787/api/db/health
+```
+
+Increment the safe smoke-test usage counter:
+
+```powershell
+Invoke-RestMethod -Method Post http://localhost:8787/api/ops/smoke-counter
+```
+
+Confirm `/api/ops/status` is reading D1-backed counters:
+
+```powershell
+Invoke-RestMethod http://localhost:8787/api/ops/status
+```
+
+Look for `counterSource` set to `d1` and a `smoke_test_counter` row in `usageCounters`.
 
 ## Deploy
 
