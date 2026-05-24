@@ -13,6 +13,8 @@ This slice serves mock JSON and includes the first D1 storage scaffold. It does 
 - `GET /api/db/health` checks that the D1 binding can run a lightweight query.
 - `POST /api/ops/smoke-counter` increments a safe D1 usage counter for operator smoke testing.
 - `POST /api/parser/smoke` parses caller-provided local text or HTML and returns extracted events without fetching or storing anything.
+- `POST /api/poll/manual` runs one operator-initiated source poll. No scheduled polling is configured.
+- `GET /api/source-health` returns recent D1 source check status, or an empty array when unavailable.
 
 ## Local Development
 
@@ -35,6 +37,7 @@ Then open:
 - `http://localhost:8787/api/events`
 - `http://localhost:8787/api/db/health`
 - `http://localhost:8787/api/ops/status`
+- `http://localhost:8787/api/source-health`
 
 ## D1 Smoke Test
 
@@ -57,6 +60,36 @@ Invoke-RestMethod http://localhost:8787/api/ops/status
 ```
 
 Look for `counterSource` set to `d1` and a `smoke_test_counter` row in `usageCounters`.
+
+## Manual Poll
+
+Manual polling is operator-triggered only. There is no cron trigger or scheduled handler in this Worker slice.
+
+Run one poll across the enabled source registry:
+
+```powershell
+Invoke-RestMethod -Method Post http://localhost:8787/api/poll/manual
+```
+
+Dry-run a single source without writing events, raw snapshots, or source checks:
+
+```powershell
+$body = @{
+  dryRun = $true
+  limitSources = @("ap-summary")
+} | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Method Post http://localhost:8787/api/poll/manual -ContentType "application/json" -Body $body
+```
+
+Check source health after a non-dry-run poll:
+
+```powershell
+Invoke-RestMethod http://localhost:8787/api/source-health
+```
+
+Manual poll usage counters are approximate operator counters. The poller increments counters for `manual_poll_runs`, `source_fetches`, `source_failures`, `events_extracted`, `events_inserted`, `raw_snapshots_written`, `d1_reads`, and `d1_writes`. The `d1_reads` and `d1_writes` values are scoped to the manual poll flow and do not recursively count the usage-counter writes themselves.
+
+TODO before scaling public traffic: add request-wide `public_api_requests` counters and non-poll endpoint `d1_reads` counters. This slice wires the manual poll fetch/read/write path only.
 
 ## Parser Smoke Test
 

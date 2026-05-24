@@ -1,7 +1,8 @@
 import { buildOpsStatus, type OpsEnv } from './ops/status';
 import { extractEventsFromHtmlOrText } from './parser/extractEvents';
 import type { ParserSmokeRequest } from './parser/types';
-import { checkDbHealth, incrementUsageCounter, listRecentEvents, type WorkerEnv } from './storage/d1';
+import { runManualPoll, type ManualPollOptions } from './polling/manualPoll';
+import { checkDbHealth, incrementUsageCounter, listRecentEvents, listSourceHealth, type WorkerEnv } from './storage/d1';
 
 type SourceTier = 'official' | 'media_live' | 'wire' | 'social' | 'manual';
 type Confidence = 'official' | 'attributed_to_official' | 'media_reported' | 'unconfirmed';
@@ -127,6 +128,28 @@ function isParserSmokeRequest(value: unknown): value is ParserSmokeRequest {
   );
 }
 
+function isManualPollOptions(value: unknown): value is ManualPollOptions {
+  if (!value || typeof value !== 'object') return false;
+
+  const maybeOptions = value as ManualPollOptions;
+  const limitSourcesValid =
+    maybeOptions.limitSources === undefined ||
+    (Array.isArray(maybeOptions.limitSources) &&
+      maybeOptions.limitSources.every((sourceId) => typeof sourceId === 'string'));
+
+  return limitSourcesValid && (maybeOptions.dryRun === undefined || typeof maybeOptions.dryRun === 'boolean');
+}
+
+async function readOptionalJsonBody(request: Request): Promise<unknown> {
+  const text = await request.text();
+
+  if (!text.trim()) {
+    return {};
+  }
+
+  return JSON.parse(text) as unknown;
+}
+
 function buildMockEvents(now: string): HazmatEvent[] {
   return [
     {
@@ -241,6 +264,8 @@ export default {
   async fetch(request: Request, env: WorkerEnv & OpsEnv): Promise<Response> {
     const url = new URL(request.url);
 
+    // TODO: add request-wide public_api_requests and non-poll d1_reads counters
+    // before scaling public API traffic. Manual poll fetch/read/write counters are wired.
     if (request.method === 'GET' && url.pathname === '/api/health') {
       return jsonResponse({ ok: true, service: SERVICE_NAME });
     }
@@ -302,8 +327,42 @@ export default {
       }
     }
 
+    if (request.method === 'POST' && url.pathname === '/api/poll/manual') {
+      try {
+        const body = await readOptionalJsonBody(request);
+
+        if (!isManualPollOptions(body)) {
+          return jsonResponse(
+            {
+              ok: false,
+              error: 'Expected optional JSON body with limitSources string array and/or dryRun boolean.',
+            },
+            { status: 400 },
+          );
+        }
+
+        return jsonResponse(await runManualPoll(env, body));
+      } catch (error) {
+        return jsonResponse(
+          {
+            ok: false,
+            error: errorMessage(error),
+          },
+          { status: 500 },
+        );
+      }
+    }
+
     if (request.method === 'GET' && url.pathname === '/api/ops/status') {
       return jsonResponse(await buildOpsStatus(env, request));
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/source-health') {
+      try {
+        return jsonResponse(await listSourceHealth(env));
+      } catch {
+        return jsonResponse([]);
+      }
     }
 
     if (request.method === 'GET' && url.pathname === '/api/status') {

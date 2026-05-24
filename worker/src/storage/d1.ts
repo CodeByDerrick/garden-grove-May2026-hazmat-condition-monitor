@@ -39,6 +39,7 @@ export type UsageCounter = {
 
 export type StoredHazmatEvent = {
   id: string;
+  sourceId?: string;
   observedAt: string;
   sourcePublishedAt?: string;
   sourceName: string;
@@ -56,6 +57,15 @@ export type StoredHazmatEvent = {
   rulePriority?: number;
 };
 
+export type StoredSource = {
+  id: string;
+  name: string;
+  url: string;
+  tier: string;
+  enabled?: boolean;
+  priority?: number;
+};
+
 export type SourceCheckInput = {
   id: string;
   sourceId: string;
@@ -65,6 +75,14 @@ export type SourceCheckInput = {
   error?: string;
   contentHash?: string;
   changed?: boolean;
+};
+
+export type RawSnapshotInput = {
+  id: string;
+  sourceId: string;
+  checkedAt: string;
+  contentHash: string;
+  textExcerpt?: string;
 };
 
 export type SourceHealth = {
@@ -259,6 +277,26 @@ export async function listRecentEvents(env: WorkerEnv, limit = 50): Promise<Stor
   return (result.results ?? []).map(mapEventRow);
 }
 
+export async function upsertSource(env: WorkerEnv, source: StoredSource): Promise<void> {
+  const db = requireDb(env);
+  const now = new Date().toISOString();
+
+  await db
+    .prepare(
+      `INSERT INTO sources (id, name, url, tier, enabled, priority, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         name = excluded.name,
+         url = excluded.url,
+         tier = excluded.tier,
+         enabled = excluded.enabled,
+         priority = excluded.priority,
+         updated_at = excluded.updated_at`,
+    )
+    .bind(source.id, source.name, source.url, source.tier, source.enabled === false ? 0 : 1, source.priority ?? 1, now, now)
+    .run();
+}
+
 export async function incrementUsageCounter(
   env: WorkerEnv,
   metric: string,
@@ -317,18 +355,28 @@ export async function listUsageCounters(env: WorkerEnv, bucketStart = getTodayBu
 export async function insertEventIfNew(env: WorkerEnv, event: StoredHazmatEvent): Promise<boolean> {
   const db = requireDb(env);
   const now = new Date().toISOString();
+  const existing = await db
+    .prepare('SELECT id FROM events WHERE content_hash = ? LIMIT 1')
+    .bind(event.contentHash)
+    .all<{ id: string }>();
+
+  if ((existing.results ?? []).length > 0) {
+    return false;
+  }
+
   const result = await db
     .prepare(
       `INSERT OR IGNORE INTO events (
          id, observed_at, source_published_at, source_id, source_name, source_url, source_tier,
          category, value, units, summary, excerpt, confidence, severity, content_hash,
          source_priority, rule_priority, created_at
-       ) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       event.id,
       event.observedAt,
       event.sourcePublishedAt ?? null,
+      event.sourceId ?? null,
       event.sourceName,
       event.sourceUrl,
       event.sourceTier,
@@ -347,6 +395,27 @@ export async function insertEventIfNew(env: WorkerEnv, event: StoredHazmatEvent)
     .run();
 
   return (result.meta?.changes ?? 0) > 0;
+}
+
+export async function insertRawSnapshot(env: WorkerEnv, snapshot: RawSnapshotInput): Promise<void> {
+  const db = requireDb(env);
+  const createdAt = new Date().toISOString();
+
+  await db
+    .prepare(
+      `INSERT OR IGNORE INTO raw_snapshots (
+         id, source_id, checked_at, content_hash, text_excerpt, created_at
+       ) VALUES (?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      snapshot.id,
+      snapshot.sourceId,
+      snapshot.checkedAt,
+      snapshot.contentHash,
+      snapshot.textExcerpt ?? null,
+      createdAt,
+    )
+    .run();
 }
 
 export async function recordSourceCheck(env: WorkerEnv, check: SourceCheckInput): Promise<void> {
