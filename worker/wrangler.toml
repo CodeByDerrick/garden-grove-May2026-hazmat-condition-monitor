@@ -9,6 +9,6 @@ enabled = true
 binding = "DB"
 # Replace these placeholder values after running:
 #   npx wrangler d1 create hazmat-condition-monitor
-database_name = "hazmat-condition-monitor-placeholder"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_name = "hazmat-condition-monitor"
+database_id = "edcf8894-5266-46e7-92f3-4f549c7f8f43"
 migrations_dir = "migrations"
