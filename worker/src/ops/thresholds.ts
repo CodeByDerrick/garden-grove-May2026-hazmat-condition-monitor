@@ -1,7 +1,12 @@
 export const OPS_THRESHOLDS = {
   workerRequestsDailyLimit: 100_000,
+  manualPollRunsExpectedMax: 24,
+  manualPollDryRunsExpectedMax: 48,
   scheduledPollRunsExpectedMax: 288,
   sourceFetchesExpectedMax: 2_000,
+  eventsExtractedExpectedMax: 5_000,
+  eventsInsertedExpectedMax: 1_000,
+  rawSnapshotsWrittenExpectedMax: 500,
   publicApiRequestsExpectedMax: 50_000,
   d1ReadsDailyLimit: 5_000_000,
   d1WritesDailyLimit: 100_000,

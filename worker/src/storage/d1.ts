@@ -86,12 +86,18 @@ export type RawSnapshotInput = {
 };
 
 export type SourceHealth = {
+  sourceId?: string;
   sourceName: string;
   sourceUrl?: string;
   lastCheckedAt: string;
   ok: boolean;
+  statusCode?: number;
   lastChangedAt?: string;
   error?: string;
+  failureClass?: string;
+  errorMessage?: string;
+  stage?: string;
+  excerpt?: string;
 };
 
 export type ManualOverride = {
@@ -132,10 +138,12 @@ type EventRow = {
 };
 
 type SourceHealthRow = {
+  source_id: string;
   source_name: string;
   source_url?: string;
   last_checked_at?: string;
   ok?: number;
+  status_code?: number;
   last_changed_at?: string;
   error?: string;
 };
@@ -221,6 +229,32 @@ function mapUsageCounterRow(row: UsageCounterRow): UsageCounter {
     count: row.count,
     updatedAt: row.updated_at,
   };
+}
+
+function parseSourceHealthError(error?: string): Pick<SourceHealth, 'failureClass' | 'errorMessage' | 'stage' | 'excerpt'> {
+  if (!error) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(error) as {
+      failureClass?: string;
+      errorMessage?: string;
+      stage?: string;
+      excerpt?: string;
+    };
+
+    return {
+      failureClass: parsed.failureClass,
+      errorMessage: parsed.errorMessage,
+      stage: parsed.stage,
+      excerpt: parsed.excerpt,
+    };
+  } catch {
+    return {
+      errorMessage: error,
+    };
+  }
 }
 
 export function getTodayBucketStart(): string {
@@ -444,9 +478,11 @@ export async function listSourceHealth(env: WorkerEnv): Promise<SourceHealth[]> 
   const result = await db
     .prepare(
       `SELECT s.name AS source_name,
+              s.id AS source_id,
               s.url AS source_url,
               latest.checked_at AS last_checked_at,
               latest.ok AS ok,
+              latest.status_code AS status_code,
               CASE WHEN latest.changed = 1 THEN latest.checked_at ELSE NULL END AS last_changed_at,
               latest.error AS error
          FROM sources s
@@ -464,12 +500,15 @@ export async function listSourceHealth(env: WorkerEnv): Promise<SourceHealth[]> 
     .all<SourceHealthRow>();
 
   return (result.results ?? []).map((row) => ({
+    sourceId: row.source_id,
     sourceName: row.source_name,
     sourceUrl: row.source_url || undefined,
     lastCheckedAt: row.last_checked_at || new Date(0).toISOString(),
     ok: row.ok === 1,
+    statusCode: row.status_code ?? undefined,
     lastChangedAt: row.last_changed_at || undefined,
     error: row.error || undefined,
+    ...parseSourceHealthError(row.error),
   }));
 }
 

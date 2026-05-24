@@ -44,6 +44,8 @@ export type ParsedHazmatEvent = {
   contentHash: string;
   sourcePriority: number;
   rulePriority: number;
+  parserQuality: 'high' | 'medium' | 'low';
+  parserReasons: string[];
 };
 
 export type ConditionRule = {

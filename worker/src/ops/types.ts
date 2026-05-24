@@ -22,11 +22,16 @@ export type OpsStatus = {
     workerRequests: OpsCounterStatus & { today: number; limit: number };
     scheduledPollRuns: OpsCounterStatus & { today: number; expectedMax: number };
     sourceFetches: OpsCounterStatus & { today: number; expectedMax: number };
+    manualPollRuns: OpsCounterStatus & { today: number; expectedMax: number };
+    manualPollDryRuns: OpsCounterStatus & { today: number; expectedMax: number };
     publicApiRequests: OpsCounterStatus & { today: number; expectedMax: number };
     d1Reads: OpsCounterStatus & { today: number; limit: number };
     d1Writes: OpsCounterStatus & { today: number; limit: number };
     d1StorageEstimate: OpsCounterStatus & { bytes: number; limitBytes: number };
     sourceFailures: OpsCounterStatus & { today: number; threshold: number };
+    eventsExtracted: OpsCounterStatus & { today: number; expectedMax: number };
+    eventsInserted: OpsCounterStatus & { today: number; expectedMax: number };
+    rawSnapshotsWritten: OpsCounterStatus & { today: number; expectedMax: number };
   };
   timestamps: {
     lastPollAt?: string;

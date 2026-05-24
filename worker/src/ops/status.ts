@@ -8,6 +8,8 @@ export type OpsEnv = {
 
 const METRICS = {
   workerRequests: 'worker_requests',
+  manualPollRuns: 'manual_poll_runs',
+  manualPollDryRuns: 'manual_poll_dry_runs',
   scheduledPollRuns: 'scheduled_poll_runs',
   sourceFetches: 'source_fetches',
   publicApiRequests: 'public_api_requests',
@@ -15,6 +17,9 @@ const METRICS = {
   d1Writes: 'd1_writes',
   d1StorageEstimate: 'd1_storage_bytes',
   sourceFailures: 'source_failures',
+  eventsExtracted: 'events_extracted',
+  eventsInserted: 'events_inserted',
+  rawSnapshotsWritten: 'raw_snapshots_written',
 } as const;
 
 function detectEnvironment(env: OpsEnv, request: Request): OpsEnvironment {
@@ -132,6 +137,14 @@ export async function buildOpsStatus(env: OpsEnv & WorkerEnv, request: Request):
         countFor(usageCounters, METRICS.sourceFetches),
         OPS_THRESHOLDS.sourceFetchesExpectedMax,
       ),
+      manualPollRuns: expectedCounter(
+        countFor(usageCounters, METRICS.manualPollRuns),
+        OPS_THRESHOLDS.manualPollRunsExpectedMax,
+      ),
+      manualPollDryRuns: expectedCounter(
+        countFor(usageCounters, METRICS.manualPollDryRuns),
+        OPS_THRESHOLDS.manualPollDryRunsExpectedMax,
+      ),
       publicApiRequests: expectedCounter(
         countFor(usageCounters, METRICS.publicApiRequests),
         OPS_THRESHOLDS.publicApiRequestsExpectedMax,
@@ -145,6 +158,18 @@ export async function buildOpsStatus(env: OpsEnv & WorkerEnv, request: Request):
       sourceFailures: thresholdCounter(
         countFor(usageCounters, METRICS.sourceFailures),
         OPS_THRESHOLDS.sourceFailuresDailyThreshold,
+      ),
+      eventsExtracted: expectedCounter(
+        countFor(usageCounters, METRICS.eventsExtracted),
+        OPS_THRESHOLDS.eventsExtractedExpectedMax,
+      ),
+      eventsInserted: expectedCounter(
+        countFor(usageCounters, METRICS.eventsInserted),
+        OPS_THRESHOLDS.eventsInsertedExpectedMax,
+      ),
+      rawSnapshotsWritten: expectedCounter(
+        countFor(usageCounters, METRICS.rawSnapshotsWritten),
+        OPS_THRESHOLDS.rawSnapshotsWrittenExpectedMax,
       ),
     },
     timestamps: {
