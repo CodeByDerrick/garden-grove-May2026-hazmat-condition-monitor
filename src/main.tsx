@@ -7,8 +7,8 @@ import './styles.css';
 
 const REFRESH_INTERVAL_MS = 15000;
 
-function formatDateTime(value?: string): string {
-  if (!value) return 'Unknown';
+function formatDateTime(value?: string, fallback = 'Unknown'): string {
+  if (!value) return fallback;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat(undefined, {
@@ -45,8 +45,8 @@ function CurrentConditions({ status }: { status: CurrentStatus }) {
       <p className="summary">{status.physicalSituationSummary}</p>
 
       <div className="condition-grid">
-        <ConditionItem label="Last checked" value={formatDateTime(status.generatedAt)} icon={<Clock />} />
-        <ConditionItem label="Last physical update" value={formatDateTime(status.lastPhysicalUpdateAt)} icon={<Wifi />} />
+        <ConditionItem label="Monitor checked" value={formatDateTime(status.generatedAt)} icon={<Clock />} />
+        <ConditionItem label="Latest captured physical signal" value={formatDateTime(status.lastPhysicalUpdateAt)} icon={<Wifi />} />
         <ConditionItem label="Tank temperature" value={tankDisplay} icon={<Thermometer />} detail={tank?.sourceName} />
         <ConditionItem label="Temperature trend" value={label(tank?.trend)} detail={label(String(tank?.confidence ?? status.confidence ?? 'unknown'))} />
         <ConditionItem label="Leak / plume" value={status.leakPlumeStatus ?? 'No current public update'} />
@@ -81,7 +81,7 @@ function UpdateLog({ events }: { events: HazmatEvent[] }) {
       <div className="section-heading compact">
         <Clock aria-hidden="true" />
         <div>
-          <p className="eyebrow">Newest First</p>
+          <p className="eyebrow">Newest Captured First</p>
           <h2>Timestamped Update Log</h2>
         </div>
       </div>
@@ -96,8 +96,8 @@ function UpdateLog({ events }: { events: HazmatEvent[] }) {
             <p className="event-summary">{event.summary}</p>
             {event.excerpt ? <blockquote>{event.excerpt}</blockquote> : null}
             <div className="event-meta">
-              <span>Observed: {formatDateTime(event.observedAt)}</span>
-              <span>Source time: {formatDateTime(event.sourcePublishedAt)}</span>
+              <span>Captured by monitor: {formatDateTime(event.observedAt)}</span>
+              <span>Source-published time: {formatDateTime(event.sourcePublishedAt, 'Not found in source')}</span>
               <span>Confidence: {label(event.confidence)}</span>
             </div>
             <a className="source-link" href={event.sourceUrl} target="_blank" rel="noreferrer">
