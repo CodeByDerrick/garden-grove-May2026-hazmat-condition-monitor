@@ -1,3 +1,4 @@
+import { buildOpsStatus, type OpsEnv } from './ops/status';
 import { listRecentEvents, type WorkerEnv } from './storage/d1';
 
 type SourceTier = 'official' | 'media_live' | 'wire' | 'social' | 'manual';
@@ -215,7 +216,7 @@ async function getEvents(env: WorkerEnv): Promise<HazmatEvent[]> {
 }
 
 export default {
-  async fetch(request: Request, env: WorkerEnv): Promise<Response> {
+  async fetch(request: Request, env: WorkerEnv & OpsEnv): Promise<Response> {
     const url = new URL(request.url);
 
     if (request.method !== 'GET') {
@@ -224,6 +225,10 @@ export default {
 
     if (url.pathname === '/api/health') {
       return jsonResponse({ ok: true, service: SERVICE_NAME });
+    }
+
+    if (url.pathname === '/api/ops/status') {
+      return jsonResponse(buildOpsStatus(env, request));
     }
 
     if (url.pathname === '/api/status') {

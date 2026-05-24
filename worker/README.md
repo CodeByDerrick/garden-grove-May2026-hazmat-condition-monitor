@@ -9,6 +9,7 @@ This slice serves mock JSON and includes the first D1 storage scaffold. It does 
 - `GET /api/health` returns Worker health metadata.
 - `GET /api/status` returns a mock `CurrentStatus`-shaped object.
 - `GET /api/events` reads recent D1 events when the `DB` binding is available and falls back to mock `HazmatEvent`-like objects otherwise.
+- `GET /api/ops/status` returns mock operator status and quota guardrail data.
 
 ## Local Development
 
