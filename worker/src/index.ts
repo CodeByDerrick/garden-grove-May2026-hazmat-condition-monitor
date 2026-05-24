@@ -1,8 +1,9 @@
 import { buildOpsStatus, type OpsEnv } from './ops/status';
 import { extractEventsFromHtmlOrText } from './parser/extractEvents';
-import { hasMediaIncidentSignal, isPageFurniture } from './parser/noiseFilters';
 import type { ParserSmokeRequest } from './parser/types';
 import { runManualPoll, type ManualPollOptions } from './polling/manualPoll';
+import { shouldExposeEvent } from './events/filter';
+import { buildCurrentStatusFromD1 } from './status/currentStatus';
 import { checkDbHealth, incrementUsageCounter, listRecentEvents, listSourceHealth, type WorkerEnv } from './storage/d1';
 
 type SourceTier = 'official' | 'media_live' | 'wire' | 'social' | 'manual';
@@ -262,41 +263,6 @@ async function getEvents(env: WorkerEnv, includeLowQuality = false): Promise<Haz
   return buildMockEvents(new Date().toISOString());
 }
 
-function hasOperationalEvacuationDetail(eventText: string): boolean {
-  const lower = eventText.toLowerCase();
-
-  return (
-    lower.includes('mandatory') ||
-    lower.includes('order') ||
-    lower.includes('zone') ||
-    lower.includes('area') ||
-    lower.includes('expanded') ||
-    lower.includes('lifted') ||
-    lower.includes('shelter') ||
-    lower.includes('residents') ||
-    lower.includes('north of') ||
-    lower.includes('south of') ||
-    lower.includes('east of') ||
-    lower.includes('west of') ||
-    lower.includes('western') ||
-    lower.includes('address')
-  );
-}
-
-function shouldExposeEvent(event: { sourceTier: string; summary: string; excerpt?: string; category: string }): boolean {
-  if (event.sourceTier !== 'media_live' && event.sourceTier !== 'wire') {
-    return true;
-  }
-
-  const eventText = `${event.summary} ${event.excerpt ?? ''}`;
-
-  if (isPageFurniture(event.excerpt ?? '') || isPageFurniture(eventText) || !hasMediaIncidentSignal(eventText)) {
-    return false;
-  }
-
-  return event.category !== 'evacuation' || hasOperationalEvacuationDetail(eventText);
-}
-
 export default {
   async fetch(request: Request, env: WorkerEnv & OpsEnv): Promise<Response> {
     const url = new URL(request.url);
@@ -403,19 +369,11 @@ export default {
     }
 
     if (request.method === 'GET' && url.pathname === '/api/status') {
-      const status = buildMockStatus();
-
       try {
-        const events = (await listRecentEvents(env, 25)).filter(shouldExposeEvent).slice(0, 10);
-
-        if (events.length > 0) {
-          status.newestEvents = events as HazmatEvent[];
-        }
+        return jsonResponse(await buildCurrentStatusFromD1(env));
       } catch {
-        // Keep status mock-compatible until the D1-backed status builder exists.
+        return jsonResponse(buildMockStatus());
       }
-
-      return jsonResponse(status);
     }
 
     if (request.method === 'GET' && url.pathname === '/api/events') {

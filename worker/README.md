@@ -62,6 +62,15 @@ Invoke-RestMethod http://localhost:8787/api/ops/status
 
 Look for `counterSource` set to `d1` and a `smoke_test_counter` row in `usageCounters`.
 
+Verify the dashboard-compatible D1 status response:
+
+```powershell
+$status = Invoke-RestMethod http://localhost:8787/api/status
+$status.tankTemperature
+$status.sourceFreshness
+$status.newestEvents.Count
+```
+
 ## Manual Poll
 
 Manual polling is operator-triggered only. There is no cron trigger or scheduled handler in this Worker slice.
