@@ -1,4 +1,6 @@
 import { buildOpsStatus, type OpsEnv } from './ops/status';
+import { extractEventsFromHtmlOrText } from './parser/extractEvents';
+import type { ParserSmokeRequest } from './parser/types';
 import { checkDbHealth, incrementUsageCounter, listRecentEvents, type WorkerEnv } from './storage/d1';
 
 type SourceTier = 'official' | 'media_live' | 'wire' | 'social' | 'manual';
@@ -107,6 +109,22 @@ function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
       ...init.headers,
     },
   });
+}
+
+function isParserSmokeRequest(value: unknown): value is ParserSmokeRequest {
+  if (!value || typeof value !== 'object') return false;
+
+  const maybeRequest = value as ParserSmokeRequest;
+  const source = maybeRequest.source;
+
+  return Boolean(
+    source &&
+      typeof source.id === 'string' &&
+      typeof source.name === 'string' &&
+      typeof source.url === 'string' &&
+      typeof source.tier === 'string' &&
+      (typeof maybeRequest.html === 'string' || typeof maybeRequest.text === 'string'),
+  );
 }
 
 function buildMockEvents(now: string): HazmatEvent[] {
@@ -249,6 +267,37 @@ export default {
             error: errorMessage(error),
           },
           { status: 503 },
+        );
+      }
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/parser/smoke') {
+      try {
+        const body = (await request.json()) as unknown;
+
+        if (!isParserSmokeRequest(body)) {
+          return jsonResponse(
+            {
+              ok: false,
+              error: 'Expected JSON body with source plus html or text.',
+            },
+            { status: 400 },
+          );
+        }
+
+        const result = extractEventsFromHtmlOrText(body.source, body.html, body.text);
+
+        return jsonResponse({
+          ok: true,
+          ...result,
+        });
+      } catch (error) {
+        return jsonResponse(
+          {
+            ok: false,
+            error: errorMessage(error),
+          },
+          { status: 400 },
         );
       }
     }
