@@ -1,0 +1,6 @@
+name = "hazmat-condition-monitor-worker"
+main = "src/index.ts"
+compatibility_date = "2026-05-24"
+
+[observability]
+enabled = true
