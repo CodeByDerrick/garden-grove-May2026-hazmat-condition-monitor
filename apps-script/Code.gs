@@ -14,10 +14,26 @@ var EVENT_SHEET_NAME = 'Events';
 var SOURCE_HEALTH_SHEET_NAME = 'SourceHealth';
 var MANUAL_OVERRIDE_SHEET_NAME = 'ManualOverrides';
 
+var OFFICIAL_GARDEN_GROVE_URL = 'https://ggcity.org/emergency';
+var OC_SHERIFF_RESOURCES_URL = 'https://www.ocsheriff.gov/resources-during-disaster';
+var OCFA_URL = 'https://www.ocfa.org/';
+var CAL_OES_URL = 'https://news.caloes.ca.gov/community-resources-for-garden-grove-hazmat-incident/';
+
+var INCIDENT_ANCHORS = [
+  'garden grove', 'gkn aerospace', 'methyl methacrylate', 'mma', 'chemical tank',
+  'orange county fire authority', 'craig covey', 'western ave', '12122 western'
+];
+
+var NOISE_ANCHORS = [
+  'newsletter', 'sports', 'entertainment', 'fashion', 'quizzes', 'top stories',
+  'related stories', 'poll release', 'share this', 'read more', 'celebrity', 'basketball',
+  'football', 'movies', 'music', 'pinterest', 'reddit', 'flipboard'
+];
+
 var SOURCES = [
-  { id: 'garden-grove-emergency', name: 'Garden Grove Emergency Page', url: 'https://ggcity.org/emergency', tier: 'official', enabled: true, priority: 10 },
-  { id: 'oc-sheriff-disaster', name: 'OC Sheriff Disaster Resources', url: 'https://www.ocsheriff.gov/resources-during-disaster', tier: 'official', enabled: true, priority: 10 },
-  { id: 'cal-oes-resource', name: 'Cal OES Garden Grove Hazmat Resources', url: 'https://news.caloes.ca.gov/community-resources-for-garden-grove-hazmat-incident/', tier: 'official', enabled: true, priority: 10 },
+  { id: 'garden-grove-emergency', name: 'Garden Grove Emergency Page', url: OFFICIAL_GARDEN_GROVE_URL, tier: 'official', enabled: true, priority: 10 },
+  { id: 'oc-sheriff-disaster', name: 'OC Sheriff Disaster Resources', url: OC_SHERIFF_RESOURCES_URL, tier: 'official', enabled: true, priority: 10 },
+  { id: 'cal-oes-resource', name: 'Cal OES Garden Grove Hazmat Resources', url: CAL_OES_URL, tier: 'official', enabled: true, priority: 10 },
   { id: 'abc7-live', name: 'ABC7 Live Updates', url: 'https://abc7.com/live-updates/garden-grove-chemical-tank-emergency-leaking-toxic-chemicals-orange-county-will-spill-explode-officials-say/19152918/', tier: 'media_live', enabled: true, priority: 7 },
   { id: 'nbc4-live', name: 'NBC4 Live Updates', url: 'https://www.nbclosangeles.com/news/local/live-updates-garden-grove-chemical-tank-crisis/3894268/', tier: 'media_live', enabled: true, priority: 7 },
   { id: 'ap-summary', name: 'Associated Press Summary', url: 'https://apnews.com/article/c1f922cae0ddb142857d12aee08d2d6b', tier: 'wire', enabled: true, priority: 4 }
@@ -41,37 +57,37 @@ var CONDITION_RULES = [
   },
   {
     category: 'thermal_runaway', severity: 'critical', priority: 10,
-    pattern: new RegExp('\\bthermal runaway\\b|\\bcatastrophic failure\\b|\\bexplosion risk\\b|\\bexplode\\b', 'i'),
+    pattern: new RegExp('\\bthermal runaway\\b|\\bcatastrophic failure\\b|\\bexplosion risk\\b|\\bexplode\\b|\\bruptur(?:e|ing)\\b', 'i'),
     summary: 'Captured high-risk tank failure or thermal-runaway language.'
   },
   {
     category: 'pressure', severity: 'warning', priority: 8,
-    pattern: new RegExp('\\bpressure\\b.{0,80}\\b(tank|valve|relief|rising|increasing|unstable)\\b|\\b(tank|valve|relief|unstable)\\b.{0,80}\\bpressure\\b', 'i'),
+    pattern: new RegExp('\\bpressure\\b.{0,100}\\b(tank|valve|relief|rising|increasing|unstable)\\b|\\b(tank|valve|relief|unstable)\\b.{0,100}\\bpressure\\b', 'i'),
     summary: 'Captured pressure-related language near tank/valve context.'
   },
   {
     category: 'leak', severity: 'warning', priority: 8,
-    pattern: new RegExp('\\b(active leak|leaking|spill(?:ed|ing)?|released?|chemical release)\\b', 'i'),
+    pattern: new RegExp('\\b(active leak|leaking|spill(?:ed|ing)?|chemical release|rupture|breach)\\b', 'i'),
     summary: 'Captured release/leak/spill language.'
   },
   {
     category: 'plume', severity: 'warning', priority: 8,
-    pattern: new RegExp('\\b(plume|vapors?|off[- ]?gassing|gas leak|chemical cloud)\\b', 'i'),
+    pattern: new RegExp('\\b(plume|vapors?|venting vapors?|off[- ]?gassing|gas leak|chemical cloud)\\b', 'i'),
     summary: 'Captured plume/vapor/off-gassing language.'
   },
   {
     category: 'air_monitoring', severity: 'watch', priority: 7,
-    pattern: new RegExp('\\bair monitoring\\b.{0,160}\\b(no|not|detected|reading|levels?|safe|unsafe|ongoing)\\b|\\b(no|not|detected|reading|levels?|safe|unsafe|ongoing)\\b.{0,160}\\bair monitoring\\b|\\bchemical vapors?\\b.{0,120}\\b(detected|not detected|no)\\b', 'i'),
+    pattern: new RegExp('\\bair monitoring\\b.{0,180}\\b(no|not|detected|reading|levels?|safe|unsafe|ongoing|tests?)\\b|\\b(no|not|detected|reading|levels?|safe|unsafe|ongoing|tests?)\\b.{0,180}\\bair monitoring\\b|\\bchemical vapors?\\b.{0,140}\\b(detected|not detected|no)\\b', 'i'),
     summary: 'Captured air-monitoring or vapor-detection language.'
   },
   {
     category: 'containment', severity: 'watch', priority: 6,
-    pattern: new RegExp('\\b(containment|berm|storm drain|runoff|dike|divert|contained)\\b.{0,120}\\b(chemical|spill|tank|water|runoff|drain|site)\\b|\\b(chemical|spill|tank|water|runoff|drain|site)\\b.{0,120}\\b(containment|berm|storm drain|runoff|dike|divert|contained)\\b', 'i'),
+    pattern: new RegExp('\\b(containment|berm|storm drain|runoff|dike|divert|contained|holding area)\\b.{0,140}\\b(chemical|spill|tank|water|runoff|drain|site|ocean|river)\\b|\\b(chemical|spill|tank|water|runoff|drain|site|ocean|river)\\b.{0,140}\\b(containment|berm|storm drain|runoff|dike|divert|contained|holding area)\\b', 'i'),
     summary: 'Captured containment/runoff/storm-drain language.'
   },
   {
     category: 'cooling', severity: 'watch', priority: 7,
-    pattern: new RegExp('\\b(cooling|cool(?:ed)?|water stream|water cannon|spray|hose)\\b.{0,140}\\b(tank|chemical|temperature|liquid|operation|effort)\\b|\\b(tank|chemical|temperature|liquid|operation|effort)\\b.{0,140}\\b(cooling|cool(?:ed)?|water stream|water cannon|spray|hose)\\b', 'i'),
+    pattern: new RegExp('\\b(cooling|cool(?:ed)?|water stream|water cannon|spray|hose)\\b.{0,160}\\b(tank|chemical|temperature|liquid|operation|effort)\\b|\\b(tank|chemical|temperature|liquid|operation|effort)\\b.{0,160}\\b(cooling|cool(?:ed)?|water stream|water cannon|spray|hose)\\b', 'i'),
     summary: 'Captured cooling-operation language.'
   },
   {
@@ -117,7 +133,7 @@ function pollSources() {
       var response = UrlFetchApp.fetch(source.url, {
         muteHttpExceptions: true,
         followRedirects: true,
-        headers: { 'User-Agent': 'GardenGroveHazmatConditionMonitor/0.2 public-source monitor' }
+        headers: { 'User-Agent': 'GardenGroveHazmatConditionMonitor/0.3 public-source monitor' }
       });
       var code = response.getResponseCode();
       var html = response.getContentText();
@@ -137,45 +153,78 @@ function pollSources() {
 
 function parseSource(source, text, observedAt, sourcePublishedAt) {
   var normalized = String(text).replace(new RegExp('\\s+', 'g'), ' ').trim();
+  var windows = buildIncidentWindows(normalized);
   var events = [];
   var seenCategories = {};
 
-  for (var i = 0; i < CONDITION_RULES.length; i++) {
-    var rule = CONDITION_RULES[i];
-    if (seenCategories[rule.category]) continue;
-    var match = normalized.match(rule.pattern);
-    if (!match) continue;
+  for (var w = 0; w < windows.length; w++) {
+    var windowText = windows[w];
+    for (var i = 0; i < CONDITION_RULES.length; i++) {
+      var rule = CONDITION_RULES[i];
+      if (seenCategories[rule.category]) continue;
+      var match = windowText.match(rule.pattern);
+      if (!match) continue;
 
-    var excerpt = makeExcerpt(normalized, match.index || 0, 360);
-    if (isWeakMatch(rule.category, excerpt)) continue;
+      var excerpt = makeExcerpt(windowText, match.index || 0, 360);
+      if (isWeakMatch(rule.category, excerpt)) continue;
 
-    var value = rule.category === 'tank_temperature' && match[1] ? Number(match[1]) : '';
-    var units = rule.category === 'tank_temperature' ? inferTemperatureUnit(match, excerpt, source) : '';
-    var summary = summarizeMatch(rule, match[0], source.name, value, units, excerpt);
-    var hash = digest(source.id + '|' + rule.category + '|' + summary + '|' + excerpt);
+      var value = rule.category === 'tank_temperature' && match[1] ? Number(match[1]) : '';
+      var units = rule.category === 'tank_temperature' ? inferTemperatureUnit(match, excerpt, source) : '';
+      var summary = summarizeMatch(rule, match[0], source.name, value, units, excerpt);
+      var hash = digest(source.id + '|' + rule.category + '|' + summary + '|' + excerpt);
 
-    events.push({
-      id: hash,
-      observedAt: observedAt,
-      sourcePublishedAt: sourcePublishedAt || '',
-      sourceName: source.name,
-      sourceUrl: source.url,
-      sourceTier: source.tier,
-      category: rule.category,
-      value: value,
-      units: units,
-      summary: summary,
-      excerpt: excerpt,
-      confidence: source.tier === 'official' ? 'official' : 'media_reported',
-      severity: rule.severity,
-      contentHash: hash,
-      sourcePriority: source.priority || sourcePriority(source.tier),
-      rulePriority: rule.priority || 0
-    });
-    seenCategories[rule.category] = true;
+      events.push({
+        id: hash,
+        observedAt: observedAt,
+        sourcePublishedAt: sourcePublishedAt || '',
+        sourceName: source.name,
+        sourceUrl: source.url,
+        sourceTier: source.tier,
+        category: rule.category,
+        value: value,
+        units: units,
+        summary: summary,
+        excerpt: excerpt,
+        confidence: source.tier === 'official' ? 'official' : 'media_reported',
+        severity: rule.severity,
+        contentHash: hash,
+        sourcePriority: source.priority || sourcePriority(source.tier),
+        rulePriority: rule.priority || 0
+      });
+      seenCategories[rule.category] = true;
+    }
   }
 
   return events;
+}
+
+function buildIncidentWindows(text) {
+  var chunks = [];
+  var normalized = String(text || '');
+  var sentences = normalized.split(new RegExp('(?<=[.!?])\\s+'));
+  for (var i = 0; i < sentences.length; i++) {
+    var group = [sentences[i - 1] || '', sentences[i], sentences[i + 1] || ''].join(' ');
+    if (hasIncidentAnchor(group) && !isMostlyNoise(group)) chunks.push(group);
+  }
+  if (!chunks.length && hasIncidentAnchor(normalized)) chunks.push(normalized.slice(0, 5000));
+  return chunks;
+}
+
+function hasIncidentAnchor(text) {
+  var lower = String(text || '').toLowerCase();
+  for (var i = 0; i < INCIDENT_ANCHORS.length; i++) if (lower.indexOf(INCIDENT_ANCHORS[i]) !== -1) return true;
+  return false;
+}
+
+function isMostlyNoise(text) {
+  var lower = String(text || '').toLowerCase();
+  var hits = 0;
+  for (var i = 0; i < NOISE_ANCHORS.length; i++) if (lower.indexOf(NOISE_ANCHORS[i]) !== -1) hits++;
+  return hits >= 2 && !hasStrongIncidentSignal(lower);
+}
+
+function hasStrongIncidentSignal(lower) {
+  return lower.indexOf('methyl methacrylate') !== -1 || lower.indexOf('gkn aerospace') !== -1 || lower.indexOf('chemical tank') !== -1 || lower.indexOf('orange county fire authority') !== -1;
 }
 
 function inferTemperatureUnit(match, excerpt, source) {
@@ -189,8 +238,9 @@ function inferTemperatureUnit(match, excerpt, source) {
 
 function isWeakMatch(category, excerpt) {
   var lower = String(excerpt || '').toLowerCase();
+  if (!hasIncidentAnchor(lower)) return true;
   if (category === 'cooling' && lower.indexOf('water') !== -1 && lower.indexOf('cool') === -1 && lower.indexOf('tank') === -1) return true;
-  if (category === 'leak' && lower.indexOf('leak') !== -1 && lower.indexOf('leaking') === -1 && lower.indexOf('spill') === -1 && lower.indexOf('release') === -1) return true;
+  if (category === 'leak' && lower.indexOf('leak') !== -1 && lower.indexOf('leaking') === -1 && lower.indexOf('spill') === -1 && lower.indexOf('release') === -1 && lower.indexOf('breach') === -1 && lower.indexOf('rupture') === -1) return true;
   if (category === 'air_monitoring' && lower === 'air monitoring') return true;
   return false;
 }
@@ -201,9 +251,7 @@ function summarizeMatch(rule, matchedText, sourceName, value, units, excerpt) {
     var unitLabel = units === 'unknown' || !units ? 'unknown unit' : '°' + units;
     return sourceName + ' reports a tank-temperature-related value of ' + value + unitLabel + '.';
   }
-  if (rule.category === 'temperature_trend') {
-    return sourceName + ' reports temperature-trend language: ' + cleaned + '.';
-  }
+  if (rule.category === 'temperature_trend') return sourceName + ' reports temperature-trend language: ' + cleaned + '.';
   if (rule.category === 'thermal_runaway') return sourceName + ' includes high-risk tank failure language: ' + cleaned + '.';
   if (rule.category === 'leak') return sourceName + ' includes release/leak/spill language: ' + cleaned + '.';
   if (rule.category === 'plume') return sourceName + ' includes plume/vapor/off-gassing language: ' + cleaned + '.';
@@ -218,22 +266,9 @@ function appendEventIfNew(event) {
   var hashes = getExistingHashes(sheet);
   if (hashes[event.contentHash]) return;
   sheet.appendRow([
-    event.id,
-    event.observedAt,
-    event.sourcePublishedAt,
-    event.sourceName,
-    event.sourceUrl,
-    event.sourceTier,
-    event.category,
-    event.value,
-    event.units,
-    event.summary,
-    event.excerpt,
-    event.confidence,
-    event.severity,
-    event.contentHash,
-    event.sourcePriority || sourcePriority(event.sourceTier),
-    event.rulePriority || 0
+    event.id, event.observedAt, event.sourcePublishedAt, event.sourceName, event.sourceUrl, event.sourceTier,
+    event.category, event.value, event.units, event.summary, event.excerpt, event.confidence, event.severity,
+    event.contentHash, event.sourcePriority || sourcePriority(event.sourceTier), event.rulePriority || 0
   ]);
 }
 
@@ -242,9 +277,7 @@ function getExistingHashes(sheet) {
   var hashes = {};
   if (lastRow < 2) return hashes;
   var values = sheet.getRange(2, 14, lastRow - 1, 1).getValues();
-  for (var i = 0; i < values.length; i++) {
-    if (values[i][0]) hashes[values[i][0]] = true;
-  }
+  for (var i = 0; i < values.length; i++) if (values[i][0]) hashes[values[i][0]] = true;
   return hashes;
 }
 
@@ -252,12 +285,7 @@ function updateSourceHealth(source, checkedAt, ok, changedAt, error, hash) {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SOURCE_HEALTH_SHEET_NAME);
   var values = sheet.getDataRange().getValues();
   var rowIndex = -1;
-  for (var i = 1; i < values.length; i++) {
-    if (values[i][0] === source.name) {
-      rowIndex = i;
-      break;
-    }
-  }
+  for (var i = 1; i < values.length; i++) if (values[i][0] === source.name) { rowIndex = i; break; }
   var row = [source.name, source.url, checkedAt, ok, changedAt, error, hash];
   if (rowIndex === -1) sheet.appendRow(row);
   else sheet.getRange(rowIndex + 1, 1, 1, row.length).setValues([row]);
@@ -285,6 +313,7 @@ function buildCurrentStatus() {
   var lastPhysical = firstEventWhereNotCategory(newestEvents, 'evacuation');
   var latestTemperature = firstEventWhereCategory(bestEvents, 'tank_temperature');
   var latestTrend = firstEventWhereCategory(bestEvents, 'temperature_trend');
+  var latestMediaPhysical = firstMediaPhysicalEvent(newestEvents);
 
   return {
     generatedAt: new Date().toISOString(),
@@ -305,9 +334,55 @@ function buildCurrentStatus() {
     overallStatus: latestOverallStatus(bestEvents),
     confidence: bestEvents[0] ? bestEvents[0].confidence : 'unconfirmed',
     physicalSituationSummary: latestOverallStatus(bestEvents),
+    resources: buildEvacuationResources(),
+    sourceFreshness: buildSourceFreshness(sourceHealth, latestMediaPhysical, newestEvents),
     newestEvents: newestEvents,
     sourceHealth: sourceHealth
   };
+}
+
+function buildEvacuationResources() {
+  return {
+    status: 'Evacuation Orders Active',
+    incidentSite: 'GKN Aerospace / MMA Leak — 12122 Western Ave, Garden Grove',
+    evacuationZone: ['South of Ball Road', 'East of Valley View Street', 'West of Dale Street', 'North of Trask Avenue'],
+    affectedCities: ['Garden Grove', 'Stanton', 'Anaheim', 'Cypress', 'Westminster', 'Buena Park'],
+    timeline: ['5/21 18:41 — OCSD mandatory evacuation order issued', '5/22 06:07 — additional evacuation orders launched', '5/22 11:16 — evacuation area expanded', '5/22 13:00 — Garden Grove text update: mandatory area expanded', '5/23 10:00 / 14:00 / 15:00 — official video updates listed'],
+    hotlines: [
+      { label: 'Garden Grove Emergency Hotline', value: '714-741-5444' },
+      { label: 'Orange County Public Information Hotline', value: '714-628-7085', note: 'Call before driving to a shelter; vacancy can fluctuate.' },
+      { label: 'OCFA Medical Information Hotline', value: '714-538-2501' },
+      { label: 'Emergency', value: '911' }
+    ],
+    officialLinks: [
+      { label: 'Garden Grove emergency page / address checker', url: OFFICIAL_GARDEN_GROVE_URL, note: 'Official evacuation map, address checker, hotel resources, multilingual notices.' },
+      { label: 'OC Sheriff disaster resources', url: OC_SHERIFF_RESOURCES_URL, note: 'Shelters, closures, affected cities, public information hotline.' },
+      { label: 'OCFA homepage', url: OCFA_URL, note: 'Official fire authority site and community hotline pointer.' },
+      { label: 'Cal OES community resources', url: CAL_OES_URL, note: 'State emergency resource page.' }
+    ],
+    shelterLinks: [{ label: 'Shelter and care center list', url: OC_SHERIFF_RESOURCES_URL, note: 'Call 714-628-7085 for current shelter availability.' }],
+    hotelLinks: [{ label: 'Hotel resources and emergency rates', url: OFFICIAL_GARDEN_GROVE_URL, note: 'Listed on official Garden Grove emergency page.' }],
+    languages: ['English', 'Spanish', 'Vietnamese', 'Korean'],
+    notes: ['Evacuation instructions are official public-safety orders, not dashboard-generated advice.', 'This monitor does not have public live tank telemetry.', 'Call the public information hotline before traveling to a shelter because capacity may change.']
+  };
+}
+
+function buildSourceFreshness(sourceHealth, latestMediaPhysical, newestEvents) {
+  return {
+    latestOfficialTextUpdate: '5/22/26 1:00 PM — Garden Grove text update: mandatory evacuation area expanded due to changing conditions.',
+    latestOfficialVideoUpdate: '5/23/26 10:00 AM, 2:00 PM, and 3:00 PM — official video updates listed on Garden Grove emergency page.',
+    latestMediaPhysicalUpdate: latestMediaPhysical ? latestMediaPhysical.sourcePublishedAt || latestMediaPhysical.observedAt : '',
+    latestMonitorCapture: newestEvents[0] ? newestEvents[0].observedAt : new Date().toISOString(),
+    telemetryStatus: 'No public live tank temperature, pressure, plume sensor, or direct telemetry feed found. Numeric tank values are public-source reports, not direct telemetry.',
+    freshnessWarning: 'Monitor capture time may be newer than source-published time. Treat older media events as stale unless confirmed by an official update or manual override.'
+  };
+}
+
+function firstMediaPhysicalEvent(events) {
+  for (var i = 0; i < events.length; i++) {
+    if ((events[i].sourceTier === 'media_live' || events[i].sourceTier === 'wire') && events[i].category !== 'evacuation') return events[i];
+  }
+  return null;
 }
 
 function rowsToEvents(sheet) {
@@ -340,22 +415,11 @@ function rowsToManualOverrides(sheet) {
     var summary = row[5] || 'Manual override entered in the monitoring sheet.';
     var observedAt = new Date().toISOString();
     events.push({
-      id: 'manual-' + i + '-' + digest(String(summary)),
-      observedAt: observedAt,
-      sourcePublishedAt: row[8] || '',
-      sourceName: row[6] || 'Manual override',
-      sourceUrl: row[7] || '',
-      sourceTier: 'manual',
-      category: category,
-      value: row[2] || '',
-      units: row[3] || '',
-      summary: summary,
-      excerpt: summary,
-      confidence: row[9] || 'attributed_to_official',
-      severity: row[10] || 'watch',
-      contentHash: 'manual-' + i,
-      sourcePriority: 99,
-      rulePriority: 99
+      id: 'manual-' + i + '-' + digest(String(summary)), observedAt: observedAt, sourcePublishedAt: row[8] || '',
+      sourceName: row[6] || 'Manual override', sourceUrl: row[7] || '', sourceTier: 'manual', category: category,
+      value: row[2] || '', units: row[3] || '', summary: summary, excerpt: summary,
+      confidence: row[9] || 'attributed_to_official', severity: row[10] || 'watch', contentHash: 'manual-' + i,
+      sourcePriority: 99, rulePriority: 99
     });
   }
   return events;
@@ -373,75 +437,19 @@ function rowsToSourceHealth(sheet) {
   return sources;
 }
 
-function firstEventWhereCategory(events, category) {
-  for (var i = 0; i < events.length; i++) if (events[i].category === category) return events[i];
-  return null;
-}
-
-function firstEventWhereNotCategory(events, category) {
-  for (var i = 0; i < events.length; i++) if (events[i].category !== category) return events[i];
-  return null;
-}
-
-function latestSummary(events, categories) {
-  for (var i = 0; i < events.length; i++) if (categories.indexOf(events[i].category) !== -1) return events[i].summary;
-  return 'No current public update captured.';
-}
-
-function latestOverallStatus(events) {
-  if (!events.length) return 'No public-source events captured yet. Run pollSources or check source access.';
-  var temp = firstEventWhereCategory(events, 'tank_temperature');
-  var trend = firstEventWhereCategory(events, 'temperature_trend');
-  if (temp && trend) return temp.summary + ' ' + trend.summary;
-  return events[0].summary;
-}
-
-function newestSourceCheck(sourceHealth) {
-  if (!sourceHealth.length) return new Date().toISOString();
-  var latest = sourceHealth[0].lastCheckedAt;
-  for (var i = 1; i < sourceHealth.length; i++) if (String(sourceHealth[i].lastCheckedAt) > String(latest)) latest = sourceHealth[i].lastCheckedAt;
-  return latest;
-}
-
-function inferTrend(text) {
-  var lower = String(text || '').toLowerCase();
-  if (lower.indexOf('stable') !== -1 || lower.indexOf('stabilized') !== -1 || lower.indexOf('maintained') !== -1) return 'stable';
-  if (lower.indexOf('rising') !== -1 || lower.indexOf('increasing') !== -1) return 'rising';
-  if (lower.indexOf('cooling') !== -1 || lower.indexOf('dropped') !== -1 || lower.indexOf('cooled') !== -1) return 'falling';
-  return 'unknown';
-}
-
-function sourcePriority(tier) {
-  if (tier === 'manual') return 99;
-  if (tier === 'official') return 10;
-  if (tier === 'media_live') return 7;
-  if (tier === 'wire') return 4;
-  return 1;
-}
-
-function doGet() {
-  var output = ContentService.createTextOutput(JSON.stringify(buildCurrentStatus()));
-  output.setMimeType(ContentService.MimeType.JSON);
-  return output;
-}
+function firstEventWhereCategory(events, category) { for (var i = 0; i < events.length; i++) if (events[i].category === category) return events[i]; return null; }
+function firstEventWhereNotCategory(events, category) { for (var i = 0; i < events.length; i++) if (events[i].category !== category) return events[i]; return null; }
+function latestSummary(events, categories) { for (var i = 0; i < events.length; i++) if (categories.indexOf(events[i].category) !== -1) return events[i].summary; return 'No current public update captured.'; }
+function latestOverallStatus(events) { if (!events.length) return 'No public-source events captured yet. Run pollSources or check source access.'; var temp = firstEventWhereCategory(events, 'tank_temperature'); var trend = firstEventWhereCategory(events, 'temperature_trend'); if (temp && trend) return temp.summary + ' ' + trend.summary; return events[0].summary; }
+function newestSourceCheck(sourceHealth) { if (!sourceHealth.length) return new Date().toISOString(); var latest = sourceHealth[0].lastCheckedAt; for (var i = 1; i < sourceHealth.length; i++) if (String(sourceHealth[i].lastCheckedAt) > String(latest)) latest = sourceHealth[i].lastCheckedAt; return latest; }
+function inferTrend(text) { var lower = String(text || '').toLowerCase(); if (lower.indexOf('stable') !== -1 || lower.indexOf('stabilized') !== -1 || lower.indexOf('maintained') !== -1) return 'stable'; if (lower.indexOf('rising') !== -1 || lower.indexOf('increasing') !== -1) return 'rising'; if (lower.indexOf('cooling') !== -1 || lower.indexOf('dropped') !== -1 || lower.indexOf('cooled') !== -1) return 'falling'; return 'unknown'; }
+function sourcePriority(tier) { if (tier === 'manual') return 99; if (tier === 'official') return 10; if (tier === 'media_live') return 7; if (tier === 'wire') return 4; return 1; }
+function doGet() { var output = ContentService.createTextOutput(JSON.stringify(buildCurrentStatus())); output.setMimeType(ContentService.MimeType.JSON); return output; }
 
 function extractSourcePublishedAt(html, text) {
-  var candidates = [
-    /property=["']article:published_time["'][^>]*content=["']([^"']+)["']/i,
-    /property=["']article:modified_time["'][^>]*content=["']([^"']+)["']/i,
-    /name=["']date["'][^>]*content=["']([^"']+)["']/i,
-    /datetime=["']([^"']+)["']/i,
-    /updated\s+(\d{1,2}:\d{2}\s*(?:AM|PM)?)/i
-  ];
+  var candidates = [/property=["']article:published_time["'][^>]*content=["']([^"']+)["']/i, /property=["']article:modified_time["'][^>]*content=["']([^"']+)["']/i, /name=["']date["'][^>]*content=["']([^"']+)["']/i, /datetime=["']([^"']+)["']/i, /updated\s+(\d{1,2}:\d{2}\s*(?:AM|PM)?)/i];
   var source = String(html || '') + ' ' + String(text || '').slice(0, 2000);
-  for (var i = 0; i < candidates.length; i++) {
-    var match = source.match(candidates[i]);
-    if (match && match[1]) {
-      var parsed = new Date(match[1]);
-      if (!isNaN(parsed.getTime())) return parsed.toISOString();
-      return match[1];
-    }
-  }
+  for (var i = 0; i < candidates.length; i++) { var match = source.match(candidates[i]); if (match && match[1]) { var parsed = new Date(match[1]); if (!isNaN(parsed.getTime())) return parsed.toISOString(); return match[1]; } }
   return '';
 }
 
@@ -457,20 +465,5 @@ function stripHtml(html) {
   text = text.replace(new RegExp('\\s+', 'g'), ' ');
   return text.trim();
 }
-
-function makeExcerpt(text, index, radius) {
-  var start = Math.max(0, index - radius);
-  var end = Math.min(text.length, index + radius);
-  return text.slice(start, end).trim();
-}
-
-function digest(value) {
-  var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, value);
-  var parts = [];
-  for (var i = 0; i < bytes.length; i++) {
-    var byte = bytes[i];
-    var v = (byte < 0 ? byte + 256 : byte).toString(16);
-    parts.push(v.length === 1 ? '0' + v : v);
-  }
-  return parts.join('');
-}
+function makeExcerpt(text, index, radius) { var start = Math.max(0, index - radius); var end = Math.min(text.length, index + radius); return text.slice(start, end).trim(); }
+function digest(value) { var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, value); var parts = []; for (var i = 0; i < bytes.length; i++) { var byte = bytes[i]; var v = (byte < 0 ? byte + 256 : byte).toString(16); parts.push(v.length === 1 ? '0' + v : v); } return parts.join(''); }
