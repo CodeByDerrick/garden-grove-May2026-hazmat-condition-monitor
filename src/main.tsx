@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { AlertTriangle, Clock, ExternalLink, RefreshCw, ShieldAlert, Thermometer, Wifi } from 'lucide-react';
+import { AlertTriangle, Clock, ExternalLink, MapPin, Phone, RefreshCw, ShieldAlert, Thermometer, Wifi } from 'lucide-react';
 import { fetchCurrentStatus } from './api';
 import type { CurrentStatus, HazmatEvent } from './types';
 import './styles.css';
@@ -30,7 +30,7 @@ function severityClass(severity?: string): string {
 
 function CurrentConditions({ status }: { status: CurrentStatus }) {
   const tank = status.tankTemperature;
-  const tankDisplay = tank?.value ? `${tank.value}°${tank.units ?? 'F'}` : 'No current numeric public update';
+  const tankDisplay = tank?.value ? `${tank.value}°${tank.units ?? 'unknown'}` : 'No current numeric public update';
 
   return (
     <section className="card hero-card">
@@ -72,6 +72,95 @@ function ConditionItem({ label: title, value, detail, icon }: { label: string; v
       <div className="condition-value">{value}</div>
       {detail ? <div className="condition-detail">{detail}</div> : null}
     </div>
+  );
+}
+
+function EvacuationResourcesPanel({ status }: { status: CurrentStatus }) {
+  const resources = status.resources;
+  if (!resources) return null;
+
+  return (
+    <section className="card">
+      <div className="section-heading compact">
+        <MapPin aria-hidden="true" />
+        <div>
+          <p className="eyebrow">Official Public Instructions</p>
+          <h2>Evacuation & Resident Resources</h2>
+        </div>
+      </div>
+
+      <div className="resource-status">
+        <strong>Status:</strong> {resources.status}
+        <br />
+        <strong>Incident site:</strong> {resources.incidentSite}
+      </div>
+
+      <div className="resource-columns">
+        <div>
+          <h3>Evacuation zone</h3>
+          <ul>{resources.evacuationZone.map((item) => <li key={item}>{item}</li>)}</ul>
+        </div>
+        <div>
+          <h3>Affected cities</h3>
+          <ul>{resources.affectedCities.map((item) => <li key={item}>{item}</li>)}</ul>
+        </div>
+      </div>
+
+      <div className="hotline-grid">
+        {resources.hotlines.map((hotline) => (
+          <div className="hotline-item" key={hotline.label}>
+            <Phone size={15} aria-hidden="true" />
+            <div>
+              <strong>{hotline.label}</strong>
+              <p>{hotline.value}</p>
+              {hotline.note ? <small>{hotline.note}</small> : null}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="link-grid">
+        {[...resources.officialLinks, ...resources.shelterLinks, ...resources.hotelLinks].map((link) => (
+          <a className="resource-link" href={link.url} target="_blank" rel="noreferrer" key={`${link.label}-${link.url}`}>
+            {link.label} <ExternalLink size={14} aria-hidden="true" />
+            {link.note ? <small>{link.note}</small> : null}
+          </a>
+        ))}
+      </div>
+
+      <div className="resource-notes">
+        <strong>Notes:</strong>
+        <ul>{resources.notes.map((note) => <li key={note}>{note}</li>)}</ul>
+        <p>Languages available: {resources.languages.join(', ')}</p>
+      </div>
+    </section>
+  );
+}
+
+function SourceFreshnessPanel({ status }: { status: CurrentStatus }) {
+  const freshness = status.sourceFreshness;
+  if (!freshness) return null;
+
+  return (
+    <section className="card">
+      <div className="section-heading compact">
+        <Clock aria-hidden="true" />
+        <div>
+          <p className="eyebrow">Freshness Check</p>
+          <h2>Source Freshness & Telemetry</h2>
+        </div>
+      </div>
+      <div className="condition-grid">
+        <ConditionItem label="Official text update" value={freshness.latestOfficialTextUpdate ?? 'Not found'} />
+        <ConditionItem label="Official video update" value={freshness.latestOfficialVideoUpdate ?? 'Not found'} />
+        <ConditionItem label="Media physical update" value={formatDateTime(freshness.latestMediaPhysicalUpdate, 'Not found')} />
+        <ConditionItem label="Monitor capture" value={formatDateTime(freshness.latestMonitorCapture, 'Unknown')} />
+      </div>
+      <div className="overall-status">
+        <strong>Telemetry:</strong> {freshness.telemetryStatus}
+        {freshness.freshnessWarning ? <><br /><strong>Freshness warning:</strong> {freshness.freshnessWarning}</> : null}
+      </div>
+    </section>
   );
 }
 
@@ -190,6 +279,8 @@ function App() {
         {status ? (
           <>
             <CurrentConditions status={status} />
+            <EvacuationResourcesPanel status={status} />
+            <SourceFreshnessPanel status={status} />
             <UpdateLog events={sortedEvents} />
             <SourceHealthPanel status={status} />
           </>
