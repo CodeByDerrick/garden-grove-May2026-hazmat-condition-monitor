@@ -9,6 +9,7 @@ This slice serves mock JSON and includes the first D1 storage scaffold. It does 
 - `GET /api/health` returns Worker health metadata.
 - `GET /api/status` returns a mock `CurrentStatus`-shaped object.
 - `GET /api/events` reads recent D1 events when the `DB` binding is available and falls back to mock `HazmatEvent`-like objects otherwise.
+- `GET /api/events?includeLowQuality=true` returns raw stored events for operator debugging.
 - `GET /api/ops/status` returns mock operator status and quota guardrail data.
 - `GET /api/db/health` checks that the D1 binding can run a lightweight query.
 - `POST /api/ops/smoke-counter` increments a safe D1 usage counter for operator smoke testing.
@@ -87,9 +88,51 @@ Check source health after a non-dry-run poll:
 Invoke-RestMethod http://localhost:8787/api/source-health
 ```
 
-Manual poll usage counters are approximate operator counters. The poller increments counters for `manual_poll_runs`, `source_fetches`, `source_failures`, `events_extracted`, `events_inserted`, `raw_snapshots_written`, `d1_reads`, and `d1_writes`. The `d1_reads` and `d1_writes` values are scoped to the manual poll flow and do not recursively count the usage-counter writes themselves.
+Inspect source failures:
+
+```powershell
+Invoke-RestMethod http://localhost:8787/api/source-health |
+  Select-Object sourceId,sourceName,ok,statusCode,failureClass,stage,errorMessage,excerpt
+```
+
+Failed manual poll results and `source_checks.error` include safe diagnostics only: `failureClass`, `stage`, `sourceId`, `sourceName`, `checkedAt`, `statusCode`, `errorMessage`, and a short body/text excerpt when available. Headers, cookies, tokens, request metadata, and full HTML are not stored.
+
+Read ops counters after polling:
+
+```powershell
+$ops = Invoke-RestMethod http://localhost:8787/api/ops/status
+$ops.counters.manualPollRuns
+$ops.counters.sourceFetches
+$ops.counters.sourceFailures
+$ops.counters.eventsExtracted
+$ops.counters.eventsInserted
+$ops.counters.rawSnapshotsWritten
+```
+
+Manual poll usage counters are approximate operator counters. The poller increments counters for `manual_poll_runs`, `manual_poll_dry_runs`, `source_fetches`, `source_failures`, `events_extracted`, `events_inserted`, `raw_snapshots_written`, `d1_reads`, and `d1_writes`. The `d1_reads` and `d1_writes` values are scoped to the manual poll flow and do not recursively count the usage-counter writes themselves.
 
 TODO before scaling public traffic: add request-wide `public_api_requests` counters and non-poll endpoint `d1_reads` counters. This slice wires the manual poll fetch/read/write path only.
+
+Scheduled polling remains intentionally disabled until source failures, parser quality, and ops counters are reviewed from manual poll runs.
+
+## Event Filtering
+
+`GET /api/events` filters stored D1 rows by default so older low-value media page furniture does not leak into operator or dashboard-facing JSON. The filter prefers official events and keeps media physical-condition events only when their excerpt has strong incident content. Media evacuation events must include operational detail such as an order, zone, shelter, affected area, residents ordered, address checker, or other official instruction.
+
+Use the raw debug view only while inspecting parser quality:
+
+```powershell
+Invoke-RestMethod "http://localhost:8787/api/events?includeLowQuality=true"
+```
+
+The endpoint remains a plain event array for compatibility. Compare counts locally with:
+
+```powershell
+$filtered = Invoke-RestMethod http://localhost:8787/api/events
+$raw = Invoke-RestMethod "http://localhost:8787/api/events?includeLowQuality=true"
+$filtered.Count
+$raw.Count
+```
 
 ## Parser Smoke Test
 

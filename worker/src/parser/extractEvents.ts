@@ -1,5 +1,6 @@
 import { CONDITION_RULES } from './conditionRules';
 import { buildIncidentWindows, hasIncidentAnchor } from './incidentWindows';
+import { hasMediaIncidentSignal, isPageFurniture } from './noiseFilters';
 import { extractSourcePublishedAt } from './sourceTime';
 import type { ConditionCategory, ConditionRule, ParsedHazmatEvent, ParserResult, ParserSource } from './types';
 
@@ -72,10 +73,39 @@ function inferTemperatureUnit(match: RegExpMatchArray, excerpt: string): 'F' | '
   return contextSupportsFahrenheit(excerpt) ? 'F' : 'unknown';
 }
 
-function isWeakMatch(category: ConditionCategory, excerpt: string): boolean {
+function hasOperationalEvacuationDetail(excerpt: string): boolean {
+  const lower = excerpt.toLowerCase();
+
+  return (
+    lower.includes('mandatory') ||
+    lower.includes('order') ||
+    lower.includes('ordered') ||
+    lower.includes('zone') ||
+    lower.includes('area') ||
+    lower.includes('expanded') ||
+    lower.includes('lifted') ||
+    lower.includes('shelter-in-place') ||
+    lower.includes('shelter in place') ||
+    lower.includes('residents') ||
+    lower.includes('north of') ||
+    lower.includes('south of') ||
+    lower.includes('east of') ||
+    lower.includes('west of') ||
+    lower.includes('western') ||
+    lower.includes('address')
+  );
+}
+
+function isMediaTier(source: ParserSource): boolean {
+  return source.tier === 'media_live' || source.tier === 'wire';
+}
+
+function isWeakMatch(source: ParserSource, category: ConditionCategory, excerpt: string): boolean {
   const lower = String(excerpt || '').toLowerCase();
 
   if (!hasIncidentAnchor(lower)) return true;
+  if (isPageFurniture(lower)) return true;
+  if (isMediaTier(source) && !hasMediaIncidentSignal(lower)) return true;
   if (category === 'cooling' && lower.includes('water') && !lower.includes('cool') && !lower.includes('tank')) return true;
   if (
     category === 'leak' &&
@@ -89,8 +119,54 @@ function isWeakMatch(category: ConditionCategory, excerpt: string): boolean {
     return true;
   }
   if (category === 'air_monitoring' && lower === 'air monitoring') return true;
+  if (category === 'evacuation' && isMediaTier(source) && !hasOperationalEvacuationDetail(lower)) return true;
 
   return false;
+}
+
+function qualityForEvent(
+  source: ParserSource,
+  category: ConditionCategory,
+  excerpt: string,
+): Pick<ParsedHazmatEvent, 'parserQuality' | 'parserReasons'> {
+  const reasons: string[] = [];
+
+  if (source.tier === 'official') {
+    reasons.push('official_source');
+  }
+  if (hasMediaIncidentSignal(excerpt)) {
+    reasons.push('strong_incident_signal');
+  }
+  if (category === 'evacuation' && hasOperationalEvacuationDetail(excerpt)) {
+    reasons.push('evacuation_operational_detail');
+  }
+  if (isPageFurniture(excerpt)) {
+    reasons.push('page_furniture_signal');
+  }
+
+  if (reasons.includes('page_furniture_signal')) {
+    return { parserQuality: 'low', parserReasons: reasons };
+  }
+  if (source.tier === 'official' || reasons.includes('strong_incident_signal')) {
+    return { parserQuality: 'high', parserReasons: reasons };
+  }
+
+  return { parserQuality: 'medium', parserReasons: reasons.length ? reasons : ['basic_incident_anchor'] };
+}
+
+function qualityRank(event: ParsedHazmatEvent): number {
+  if (event.parserQuality === 'high') return 3;
+  if (event.parserQuality === 'medium') return 2;
+  return 1;
+}
+
+function isBetterCandidate(candidate: ParsedHazmatEvent, current?: ParsedHazmatEvent): boolean {
+  if (!current) return true;
+
+  const rankDiff = qualityRank(candidate) - qualityRank(current);
+  if (rankDiff !== 0) return rankDiff > 0;
+
+  return (candidate.excerpt?.length ?? 0) > (current.excerpt?.length ?? 0);
 }
 
 function summarizeMatch(
@@ -124,26 +200,24 @@ export function extractEventsFromText(
   sourcePublishedAt?: string,
 ): ParserResult {
   const normalized = normalizeText(text);
-  const windows = buildIncidentWindows(normalized);
-  const events: ParsedHazmatEvent[] = [];
-  const seenCategories = new Set<ConditionCategory>();
+  const windows = buildIncidentWindows(normalized, source.tier);
+  const eventsByCategory = new Map<ConditionCategory, ParsedHazmatEvent>();
 
   for (const windowText of windows) {
     for (const rule of CONDITION_RULES) {
-      if (seenCategories.has(rule.category)) continue;
-
       const match = windowText.match(rule.pattern);
       if (!match) continue;
 
       const excerpt = makeExcerpt(windowText, match.index || 0, 360);
-      if (isWeakMatch(rule.category, excerpt)) continue;
+      if (isWeakMatch(source, rule.category, excerpt)) continue;
 
       const value = rule.category === 'tank_temperature' && match[1] ? Number(match[1]) : undefined;
       const units = rule.category === 'tank_temperature' ? inferTemperatureUnit(match, excerpt) : undefined;
       const summary = summarizeMatch(rule, match[0], source.name, value, units);
       const hash = digest(`${source.id}|${rule.category}|${summary}|${excerpt}`);
+      const quality = qualityForEvent(source, rule.category, excerpt);
 
-      events.push({
+      const candidate = {
         id: hash,
         observedAt,
         sourcePublishedAt,
@@ -160,10 +234,16 @@ export function extractEventsFromText(
         contentHash: hash,
         sourcePriority: source.priority || sourcePriority(source.tier),
         rulePriority: rule.priority,
-      });
-      seenCategories.add(rule.category);
+        ...quality,
+      };
+
+      if (isBetterCandidate(candidate, eventsByCategory.get(rule.category))) {
+        eventsByCategory.set(rule.category, candidate);
+      }
     }
   }
+
+  const events = [...eventsByCategory.values()];
 
   return {
     events,
