@@ -1,4 +1,3 @@
-import { shouldExposeEvent } from '../events/filter';
 import {
   listRecentEvents,
   listSourceHealth,
@@ -6,6 +5,18 @@ import {
   type StoredHazmatEvent,
   type WorkerEnv,
 } from '../storage/d1';
+import {
+  bestStatusEvent,
+  eventTimeValue,
+  filterStatusEvents,
+  isPhysicalCategory,
+  latestHighQualityMediaPhysical,
+  sanitizeStatusText,
+  sortByStatusQuality,
+  sortByStatusTime,
+  statusSummary,
+  timeValue,
+} from './selectors';
 
 type CurrentStatus = {
   generatedAt: string;
@@ -32,67 +43,25 @@ type CurrentStatus = {
   sourceHealth: SourceHealth[];
 };
 
-const PHYSICAL_CATEGORIES = new Set([
-  'tank_temperature',
-  'temperature_trend',
-  'pressure',
-  'thermal_runaway',
-  'leak',
-  'plume',
-  'air_monitoring',
-  'containment',
-  'cooling',
-  'neutralization',
-]);
-
-function timeValue(value?: string): number {
-  if (!value) return 0;
-
-  const parsed = new Date(value).getTime();
-  return Number.isNaN(parsed) ? 0 : parsed;
-}
-
-function sourceRank(event: StoredHazmatEvent): number {
-  if (event.sourceTier === 'manual') return 100;
-  if (event.sourceTier === 'official') return 80;
-  if (event.sourceTier === 'media_live') return 60;
-  if (event.sourceTier === 'wire') return 50;
-  return 10;
-}
-
-function relevanceScore(event: StoredHazmatEvent): number {
-  return sourceRank(event) + (event.sourcePriority ?? 0) + (event.rulePriority ?? 0);
-}
-
 function sortNewest(events: StoredHazmatEvent[]): StoredHazmatEvent[] {
-  return [...events].sort((a, b) => {
-    const timeDiff = timeValue(b.observedAt) - timeValue(a.observedAt);
-    if (timeDiff !== 0) return timeDiff;
-
-    return relevanceScore(b) - relevanceScore(a);
-  });
+  return sortByStatusTime(events);
 }
 
 function sortBest(events: StoredHazmatEvent[]): StoredHazmatEvent[] {
-  return [...events].sort((a, b) => {
-    const scoreDiff = relevanceScore(b) - relevanceScore(a);
-    if (scoreDiff !== 0) return scoreDiff;
-
-    return timeValue(b.observedAt) - timeValue(a.observedAt);
-  });
+  return sortByStatusQuality(events);
 }
 
 function bestByCategory(events: StoredHazmatEvent[], category: string): StoredHazmatEvent | undefined {
-  const matching = events.filter((event) => event.category === category);
-  const official = matching.filter((event) => event.sourceTier === 'official' || event.sourceTier === 'manual');
-
-  return sortBest(official.length > 0 ? official : matching)[0];
+  return bestStatusEvent(events, category, {
+    preferOfficial: category === 'evacuation' || category === 'resource',
+    physicalFallbackToMedia: isPhysicalCategory(category),
+  });
 }
 
 function latestSummary(events: StoredHazmatEvent[], categories: string[]): string {
   const matching = categories.map((category) => bestByCategory(events, category)).find(Boolean);
 
-  return matching?.summary ?? 'No current public update captured.';
+  return statusSummary(matching) ?? 'No current public update captured.';
 }
 
 function inferTrend(event?: StoredHazmatEvent): 'rising' | 'falling' | 'stable' | 'unknown' {
@@ -111,13 +80,11 @@ function newestSuccessfulPoll(sourceHealth: SourceHealth[]): string {
 }
 
 function firstPhysicalEvent(events: StoredHazmatEvent[]): StoredHazmatEvent | undefined {
-  return sortNewest(events).find((event) => PHYSICAL_CATEGORIES.has(event.category));
+  return sortNewest(events).find((event) => isPhysicalCategory(event.category));
 }
 
 function latestMediaPhysicalEvent(events: StoredHazmatEvent[]): StoredHazmatEvent | undefined {
-  return sortNewest(events).find(
-    (event) => (event.sourceTier === 'media_live' || event.sourceTier === 'wire') && PHYSICAL_CATEGORIES.has(event.category),
-  );
+  return latestHighQualityMediaPhysical(events);
 }
 
 function latestOfficialCheck(sourceHealth: SourceHealth[]): string | undefined {
@@ -159,10 +126,10 @@ function latestOverallStatus(events: StoredHazmatEvent[]): string {
   const trend = bestByCategory(events, 'temperature_trend');
 
   if (temp && trend) {
-    return `${temp.summary} ${trend.summary}`;
+    return `${sanitizeStatusText(temp.summary)} ${sanitizeStatusText(trend.summary)}`;
   }
 
-  return sortBest(events)[0]?.summary ?? 'No current public update captured.';
+  return statusSummary(sortBest(events)[0]) ?? 'No current public update captured.';
 }
 
 function buildEvacuationResources() {
@@ -251,7 +218,7 @@ function buildSourceFreshness(
 export async function buildCurrentStatusFromD1(env: WorkerEnv): Promise<CurrentStatus> {
   const generatedAt = new Date().toISOString();
   const [rawEvents, sourceHealth] = await Promise.all([listRecentEvents(env, 150), listSourceHealth(env)]);
-  const filteredEvents = rawEvents.filter(shouldExposeEvent);
+  const filteredEvents = filterStatusEvents(rawEvents);
   const newestEvents = sortNewest(filteredEvents).slice(0, 50);
   const bestEvents = sortBest(filteredEvents);
   const latestPhysical = firstPhysicalEvent(filteredEvents);
@@ -262,7 +229,7 @@ export async function buildCurrentStatusFromD1(env: WorkerEnv): Promise<CurrentS
   return {
     generatedAt,
     lastSuccessfulPollAt: newestSuccessfulPoll(sourceHealth),
-    lastPhysicalUpdateAt: latestPhysical?.observedAt,
+    lastPhysicalUpdateAt: latestPhysical ? new Date(eventTimeValue(latestPhysical)).toISOString() : undefined,
     tankTemperature: buildTankTemperature(bestEvents),
     leakPlumeStatus: latestSummary(bestEvents, ['leak', 'plume']),
     airMonitoringStatus: latestSummary(bestEvents, ['air_monitoring']),

@@ -71,6 +71,8 @@ $status.sourceFreshness
 $status.newestEvents.Count
 ```
 
+`GET /api/status` uses filtered, best-event selection for status cards. It prefers official events for official context, uses high-quality media physical-condition events when official physical-condition data is absent, and avoids obvious page furniture such as `Read More`, share blocks, related stories, key headlines, and ended live-blog fragments.
+
 ## Manual Poll
 
 Manual polling is operator-triggered only. There is no cron trigger or scheduled handler in this Worker slice.
@@ -126,7 +128,7 @@ Scheduled polling remains intentionally disabled until source failures, parser q
 
 ## Event Filtering
 
-`GET /api/events` filters stored D1 rows by default so older low-value media page furniture does not leak into operator or dashboard-facing JSON. The filter prefers official events and keeps media physical-condition events only when their excerpt has strong incident content. Media evacuation events must include operational detail such as an order, zone, shelter, affected area, residents ordered, address checker, or other official instruction.
+`GET /api/events` filters stored D1 rows by default so older low-value media page furniture does not leak into operator or dashboard-facing JSON. The filter prefers official events and keeps media physical-condition events only when their excerpt has strong incident content. Media evacuation events must include operational detail such as an order, zone, shelter, affected area, residents ordered, address checker, or other official instruction. `GET /api/status` reuses this quality gate and then applies status-specific ranking.
 
 Use the raw debug view only while inspecting parser quality:
 
