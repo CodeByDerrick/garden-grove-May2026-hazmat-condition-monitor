@@ -1,0 +1,14 @@
+{
+  "id": "example-event-id",
+  "observedAt": "2026-05-23T20:22:14-07:00",
+  "sourcePublishedAt": "2026-05-23T19:48:00-07:00",
+  "sourceName": "ABC7 Live Updates",
+  "sourceUrl": "https://abc7.com/live-updates/garden-grove-chemical-tank-emergency-leaking-toxic-chemicals-orange-county-will-spill-explode-officials-say/19152918/",
+  "sourceTier": "media_live",
+  "category": "temperature_trend",
+  "summary": "OCFA reportedly said crews maintained or stabilized the tank temperature.",
+  "excerpt": "Short source excerpt around the matched condition signal.",
+  "confidence": "media_reported",
+  "severity": "watch",
+  "contentHash": "sha256-content-hash"
+}
