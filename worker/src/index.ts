@@ -1,3 +1,5 @@
+import { listRecentEvents, type WorkerEnv } from './storage/d1';
+
 type SourceTier = 'official' | 'media_live' | 'wire' | 'social' | 'manual';
 type Confidence = 'official' | 'attributed_to_official' | 'media_reported' | 'unconfirmed';
 type Severity = 'info' | 'watch' | 'warning' | 'critical';
@@ -198,8 +200,22 @@ function buildMockStatus(): CurrentStatus {
   };
 }
 
+async function getEvents(env: WorkerEnv): Promise<HazmatEvent[]> {
+  try {
+    const events = await listRecentEvents(env, 50);
+
+    if (events.length > 0) {
+      return events as HazmatEvent[];
+    }
+  } catch {
+    // D1 is optional in this migration slice; mock data keeps the endpoint usable.
+  }
+
+  return buildMockEvents(new Date().toISOString());
+}
+
 export default {
-  fetch(request: Request): Response {
+  async fetch(request: Request, env: WorkerEnv): Promise<Response> {
     const url = new URL(request.url);
 
     if (request.method !== 'GET') {
@@ -211,11 +227,23 @@ export default {
     }
 
     if (url.pathname === '/api/status') {
-      return jsonResponse(buildMockStatus());
+      const status = buildMockStatus();
+
+      try {
+        const events = await listRecentEvents(env, 10);
+
+        if (events.length > 0) {
+          status.newestEvents = events as HazmatEvent[];
+        }
+      } catch {
+        // Keep status mock-compatible until the D1-backed status builder exists.
+      }
+
+      return jsonResponse(status);
     }
 
     if (url.pathname === '/api/events') {
-      return jsonResponse(buildMockEvents(new Date().toISOString()));
+      return jsonResponse(await getEvents(env));
     }
 
     return jsonResponse({ error: 'Not found' }, { status: 404 });

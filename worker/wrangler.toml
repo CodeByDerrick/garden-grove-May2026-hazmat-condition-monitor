@@ -4,3 +4,11 @@ compatibility_date = "2026-05-24"
 
 [observability]
 enabled = true
+
+[[d1_databases]]
+binding = "DB"
+# Replace these placeholder values after running:
+#   npx wrangler d1 create hazmat-condition-monitor
+database_name = "hazmat-condition-monitor-placeholder"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
