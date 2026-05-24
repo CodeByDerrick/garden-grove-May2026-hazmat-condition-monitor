@@ -23,6 +23,7 @@ var SOURCES = [
 ];
 
 var CONDITION_RULES = [
+  { category: 'tank_temperature', severity: 'watch', pattern: new RegExp('\\b(?:temperature|tank|chemical|liquid|it)\\b.{0,120}\\b(\\d{2,3})\\s?(?:°?\\s?F|degrees?)\\b', 'i') },
   { category: 'tank_temperature', severity: 'watch', pattern: new RegExp('\\b(\\d{2,3})\\s?°?\\s?F\\b', 'i') },
   { category: 'temperature_trend', severity: 'watch', pattern: new RegExp('\\btemperature\\b.{0,100}\\b(stabilized|stable|rising|increasing|cooling|dropped|maintained)\\b', 'i') },
   { category: 'temperature_trend', severity: 'watch', pattern: new RegExp('\\b(\\d+)\\s?degree[s]?\\s?per\\s?hour\\b', 'i') },
