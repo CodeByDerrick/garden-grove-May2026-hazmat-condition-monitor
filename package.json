@@ -11,14 +11,15 @@
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
-    "vite": "latest",
-    "typescript": "latest",
+    "lucide-react": "latest",
     "react": "latest",
     "react-dom": "latest",
-    "lucide-react": "latest"
+    "typescript": "latest",
+    "vite": "latest"
   },
   "devDependencies": {
     "@types/react": "latest",
-    "@types/react-dom": "latest"
+    "@types/react-dom": "latest",
+    "wrangler": "^4.94.0"
   }
 }
