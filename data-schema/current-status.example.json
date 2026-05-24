@@ -1,0 +1,22 @@
+{
+  "generatedAt": "2026-05-23T20:25:00-07:00",
+  "lastSuccessfulPollAt": "2026-05-23T20:24:55-07:00",
+  "lastPhysicalUpdateAt": "2026-05-23T19:48:00-07:00",
+  "tankTemperature": {
+    "value": 90,
+    "units": "F",
+    "trend": "stable",
+    "sourceName": "ABC7 Live Updates",
+    "sourcePublishedAt": "2026-05-23T19:48:00-07:00",
+    "confidence": "media_reported"
+  },
+  "leakPlumeStatus": "No current public update captured.",
+  "airMonitoringStatus": "No current public update captured.",
+  "containmentStatus": "No current public update captured.",
+  "coolingNeutralizationStatus": "No current public update captured.",
+  "overallStatus": "Latest captured public-source condition summary.",
+  "confidence": "media_reported",
+  "physicalSituationSummary": "Latest captured public-source condition summary.",
+  "newestEvents": [],
+  "sourceHealth": []
+}
