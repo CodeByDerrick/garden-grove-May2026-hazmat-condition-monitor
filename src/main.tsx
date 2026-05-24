@@ -5,7 +5,7 @@ import { fetchCurrentStatus } from './api';
 import type { CurrentStatus, HazmatEvent } from './types';
 import './styles.css';
 
-const REFRESH_INTERVAL_MS = 15_000;
+const REFRESH_INTERVAL_MS = 15000;
 
 function formatDateTime(value?: string): string {
   if (!value) return 'Unknown';
@@ -21,7 +21,7 @@ function formatDateTime(value?: string): string {
 }
 
 function label(value?: string): string {
-  return value ? value.replaceAll('_', ' ') : 'unknown';
+  return value ? value.replace(/_/g, ' ') : 'unknown';
 }
 
 function severityClass(severity?: string): string {
