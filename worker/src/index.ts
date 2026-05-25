@@ -2,7 +2,7 @@ import { buildOpsStatus, type OpsEnv } from './ops/status';
 import { extractEventsFromHtmlOrText } from './parser/extractEvents';
 import type { ParserSmokeRequest } from './parser/types';
 import { runManualPoll, type ManualPollOptions } from './polling/manualPoll';
-import { shouldExposeEvent } from './events/filter';
+import { shouldExposeEvent, toDisplayEvent } from './events/filter';
 import { buildCurrentStatusFromD1 } from './status/currentStatus';
 import { checkDbHealth, incrementUsageCounter, listRecentEvents, listSourceHealth, type WorkerEnv } from './storage/d1';
 
@@ -251,7 +251,7 @@ function buildMockStatus(): CurrentStatus {
 async function getEvents(env: WorkerEnv, includeLowQuality = false): Promise<HazmatEvent[]> {
   try {
     const rows = await listRecentEvents(env, includeLowQuality ? 50 : 150);
-    const events = includeLowQuality ? rows : rows.filter(shouldExposeEvent).slice(0, 50);
+    const events = includeLowQuality ? rows : rows.filter(shouldExposeEvent).map(toDisplayEvent).slice(0, 50);
 
     if (events.length > 0) {
       return events as HazmatEvent[];

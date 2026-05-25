@@ -5,6 +5,7 @@ import {
   type StoredHazmatEvent,
   type WorkerEnv,
 } from '../storage/d1';
+import { toDisplayEvent } from '../events/filter';
 import {
   bestStatusEvent,
   eventTimeValue,
@@ -218,7 +219,7 @@ function buildSourceFreshness(
 export async function buildCurrentStatusFromD1(env: WorkerEnv): Promise<CurrentStatus> {
   const generatedAt = new Date().toISOString();
   const [rawEvents, sourceHealth] = await Promise.all([listRecentEvents(env, 150), listSourceHealth(env)]);
-  const filteredEvents = filterStatusEvents(rawEvents);
+  const filteredEvents = filterStatusEvents(rawEvents).map(toDisplayEvent);
   const newestEvents = sortNewest(filteredEvents).slice(0, 50);
   const bestEvents = sortBest(filteredEvents);
   const latestPhysical = firstPhysicalEvent(filteredEvents);

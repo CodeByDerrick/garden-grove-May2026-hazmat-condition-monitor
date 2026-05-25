@@ -7,8 +7,8 @@ This slice serves mock JSON and includes the first D1 storage scaffold. It does 
 ## Endpoints
 
 - `GET /api/health` returns Worker health metadata.
-- `GET /api/status` returns a mock `CurrentStatus`-shaped object.
-- `GET /api/events` reads recent D1 events when the `DB` binding is available and falls back to mock `HazmatEvent`-like objects otherwise.
+- `GET /api/status` returns a dashboard-compatible `CurrentStatus`-shaped object assembled from D1 data when available.
+- `GET /api/events` reads recent display-ready D1 events when the `DB` binding is available and falls back to mock `HazmatEvent`-like objects otherwise.
 - `GET /api/events?includeLowQuality=true` returns raw stored events for operator debugging.
 - `GET /api/ops/status` returns mock operator status and quota guardrail data.
 - `GET /api/db/health` checks that the D1 binding can run a lightweight query.
@@ -128,7 +128,9 @@ Scheduled polling remains intentionally disabled until source failures, parser q
 
 ## Event Filtering
 
-`GET /api/events` filters stored D1 rows by default so older low-value media page furniture does not leak into operator or dashboard-facing JSON. The filter prefers official events and keeps media physical-condition events only when their excerpt has strong incident content. Media evacuation events must include operational detail such as an order, zone, shelter, affected area, residents ordered, address checker, or other official instruction. `GET /api/status` reuses this quality gate and then applies status-specific ranking.
+`GET /api/events` returns display-ready rows by default so older low-value media page furniture does not leak into operator or dashboard-facing JSON. The filter removes heavy page chrome such as `Share Share`, `Copy Link`, `Print Email`, `Read More`, `Key Headlines`, `Top Stories`, newsletters, related stories, copyright footers, social-link clusters, and live/video navigation clusters. It keeps media physical-condition events only when their excerpt has strong incident body evidence such as tank temperature, pressure relief, cooling operations, venting vapors, containment, or air monitoring. Media evacuation events must include operational detail such as an official order, zone boundary, shelter/care center, affected cities, address checker, road closure, or other specific official instruction.
+
+The `newestEvents` field in `GET /api/status` uses the same display-ready event filter before status-specific ranking, so the dashboard status payload does not surface raw stored page-furniture rows by default.
 
 Use the raw debug view only while inspecting parser quality:
 

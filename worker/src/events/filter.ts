@@ -1,5 +1,7 @@
 import { hasMediaIncidentSignal, isPageFurniture } from '../parser/noiseFilters';
 
+export type DisplayQuality = 'high' | 'medium' | 'low';
+
 export type FilterableEvent = {
   sourceTier: string;
   summary: string;
@@ -7,37 +9,177 @@ export type FilterableEvent = {
   category: string;
 };
 
-export function hasOperationalEvacuationDetail(eventText: string): boolean {
-  const lower = eventText.toLowerCase();
+export type DisplayEventEvaluation = {
+  displayQuality: DisplayQuality;
+  displayRejectReason?: string;
+};
 
-  return (
-    lower.includes('mandatory') ||
-    lower.includes('order') ||
-    lower.includes('zone') ||
-    lower.includes('area') ||
-    lower.includes('expanded') ||
-    lower.includes('lifted') ||
-    lower.includes('shelter') ||
-    lower.includes('residents') ||
-    lower.includes('north of') ||
-    lower.includes('south of') ||
-    lower.includes('east of') ||
-    lower.includes('west of') ||
-    lower.includes('western') ||
-    lower.includes('address')
-  );
+const PHYSICAL_CATEGORIES = new Set([
+  'tank_temperature',
+  'temperature_trend',
+  'pressure',
+  'thermal_runaway',
+  'leak',
+  'plume',
+  'air_monitoring',
+  'containment',
+  'cooling',
+  'neutralization',
+]);
+
+const HEAVY_FURNITURE_PATTERNS: Array<[RegExp, string]> = [
+  [/\bshare\s+share\b/i, 'share block'],
+  [/\bcopy\s+link\b/i, 'copy link block'],
+  [/\bprint\s+email\b/i, 'print/email block'],
+  [/\bread\s+more\b/i, 'read more block'],
+  [/\bkey\s+headlines\b/i, 'key headlines block'],
+  [/\btop\s+stories\b/i, 'top stories block'],
+  [/\bnewsletters?\b/i, 'newsletter block'],
+  [/\brelated\s+stories\b/i, 'related stories block'],
+  [/\ball\s+rights\s+reserved\b/i, 'rights/footer block'],
+];
+
+const SOCIAL_CLUSTER_TERMS = ['bluesky', 'flipboard', 'pinterest', 'reddit', 'facebook', 'twitter'];
+const LIVE_VIDEO_CLUSTER_TERMS = [
+  'watch live',
+  '24/7 live',
+  'california live',
+  'inland empire',
+  'ventura county',
+  'youtube',
+  'video',
+  'latest headlines',
+  'live updates',
+  'page navigation',
+  'navigation',
+];
+
+const PHYSICAL_EVIDENCE_PATTERNS = [
+  /\btank temperature\b/i,
+  /\btemperature (?:gauge|inside the tank|in the tank)\b/i,
+  /\bgauge covered by water\b/i,
+  /\btemperature increased to \d+/i,
+  /\b\d{2,3}\s*degrees\b/i,
+  /\bcrack(?:ed)? in (?:the )?tank\b/i,
+  /\breliev(?:e|ing|ed) pressure\b/i,
+  /\bpressure relief\b/i,
+  /\bvent(?:ing|ed)? vapou?rs?\b/i,
+  /\bcool off (?:the )?chemical\b/i,
+  /\bcooling operation\b/i,
+  /\bcooling (?:continues|water|effort|system|operations?)\b/i,
+  /\bcontainment\b/i,
+  /\bair monitoring\b/i,
+  /\bmethyl methacrylate\b/i,
+  /\bchemical tank\b/i,
+  /\bGKN Aerospace\b/i,
+];
+
+const OPERATIONAL_EVACUATION_PATTERNS = [
+  /\bofficial (?:evacuation )?order\b/i,
+  /\border (?:active|remains|issued|lifted|expanded)\b/i,
+  /\b(?:mandatory )?evacuation order\b/i,
+  /\bresidents? (?:were )?ordered\b/i,
+  /\bzone boundaries?\b/i,
+  /\b(?:north|south|east|west) of\b/i,
+  /\bshelter\b/i,
+  /\bcare center\b/i,
+  /\baffected cit(?:y|ies)\b/i,
+  /\baddress checker\b/i,
+  /\broad closure\b/i,
+  /\bofficial instruction\b/i,
+  /\b12122 Western\b/i,
+  /\bWestern Ave\b/i,
+];
+
+function normalizedText(text: string): string {
+  return String(text || '').replace(/\s+/g, ' ').trim();
+}
+
+function clusterHitCount(text: string, terms: string[]): number {
+  const lower = text.toLowerCase();
+  return terms.filter((term) => lower.includes(term)).length;
+}
+
+function heavyFurnitureReason(text: string): string | undefined {
+  const normalized = normalizedText(text);
+  if (!normalized) return undefined;
+
+  for (const [pattern, reason] of HEAVY_FURNITURE_PATTERNS) {
+    if (pattern.test(normalized)) return reason;
+  }
+
+  if (clusterHitCount(normalized, SOCIAL_CLUSTER_TERMS) >= 2) {
+    return 'social link cluster';
+  }
+
+  if (clusterHitCount(normalized, LIVE_VIDEO_CLUSTER_TERMS) >= 2) {
+    return 'live navigation/video cluster';
+  }
+
+  return undefined;
+}
+
+function hasPhysicalBodyEvidence(event: FilterableEvent, eventText: string): boolean {
+  return PHYSICAL_CATEGORIES.has(event.category) && PHYSICAL_EVIDENCE_PATTERNS.some((pattern) => pattern.test(eventText));
+}
+
+export function cleanDisplayText(text: string): string {
+  return normalizedText(text)
+    .replace(/\s*this live blog has ended\.?\s*/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function toDisplayEvent<T extends FilterableEvent>(event: T): T {
+  return {
+    ...event,
+    summary: cleanDisplayText(event.summary),
+    excerpt: event.excerpt ? cleanDisplayText(event.excerpt) : event.excerpt,
+  };
+}
+
+export function hasOperationalEvacuationDetail(eventText: string): boolean {
+  return OPERATIONAL_EVACUATION_PATTERNS.some((pattern) => pattern.test(eventText));
+}
+
+export function evaluateDisplayEvent(event: FilterableEvent): DisplayEventEvaluation {
+  const excerpt = normalizedText(event.excerpt ?? '');
+  const eventText = normalizedText(`${event.summary} ${event.excerpt ?? ''}`);
+  const excerptFurniture = heavyFurnitureReason(excerpt);
+  const combinedFurniture = heavyFurnitureReason(eventText);
+
+  if (excerptFurniture || combinedFurniture || isPageFurniture(excerpt)) {
+    return {
+      displayQuality: 'low',
+      displayRejectReason: excerptFurniture ?? combinedFurniture ?? 'page furniture',
+    };
+  }
+
+  const isMediaReported = event.sourceTier === 'media_live' || event.sourceTier === 'wire' || event.sourceTier === 'social';
+
+  if (!isMediaReported) {
+    return { displayQuality: PHYSICAL_CATEGORIES.has(event.category) ? 'high' : 'medium' };
+  }
+
+  if (!hasMediaIncidentSignal(eventText)) {
+    return { displayQuality: 'low', displayRejectReason: 'weak media incident signal' };
+  }
+
+  if (event.category === 'evacuation') {
+    return hasOperationalEvacuationDetail(eventText)
+      ? { displayQuality: 'medium' }
+      : { displayQuality: 'low', displayRejectReason: 'media evacuation lacks operational detail' };
+  }
+
+  if (hasPhysicalBodyEvidence(event, eventText)) {
+    return { displayQuality: 'high' };
+  }
+
+  return PHYSICAL_CATEGORIES.has(event.category)
+    ? { displayQuality: 'low', displayRejectReason: 'media physical event lacks body evidence' }
+    : { displayQuality: 'medium' };
 }
 
 export function shouldExposeEvent(event: FilterableEvent): boolean {
-  if (event.sourceTier !== 'media_live' && event.sourceTier !== 'wire') {
-    return true;
-  }
-
-  const eventText = `${event.summary} ${event.excerpt ?? ''}`;
-
-  if (isPageFurniture(event.excerpt ?? '') || isPageFurniture(eventText) || !hasMediaIncidentSignal(eventText)) {
-    return false;
-  }
-
-  return event.category !== 'evacuation' || hasOperationalEvacuationDetail(eventText);
+  return evaluateDisplayEvent(event).displayQuality !== 'low';
 }

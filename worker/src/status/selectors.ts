@@ -1,4 +1,4 @@
-import { shouldExposeEvent } from '../events/filter';
+import { evaluateDisplayEvent, shouldExposeEvent } from '../events/filter';
 import { hasMediaIncidentSignal, isPageFurniture } from '../parser/noiseFilters';
 import type { StoredHazmatEvent } from '../storage/d1';
 
@@ -16,9 +16,11 @@ const PHYSICAL_CATEGORIES = new Set([
 ]);
 
 const FURNITURE_TERMS = [
+  'share share',
   'read more',
   'share',
   'copy link',
+  'print email',
   'print',
   'email',
   'top stories',
@@ -27,6 +29,14 @@ const FURNITURE_TERMS = [
   'newsletters',
   'key headlines',
   'this live blog has ended',
+  'all rights reserved',
+  'watch live',
+  '24/7 live',
+  'california live',
+  'inland empire',
+  'ventura county',
+  'youtube',
+  'video',
   'bluesky',
   'flipboard',
   'pinterest',
@@ -63,8 +73,13 @@ export function sourceRank(event: StoredHazmatEvent): number {
 function furniturePenalty(event: StoredHazmatEvent): number {
   const lower = eventText(event).toLowerCase();
   const hits = FURNITURE_TERMS.filter((term) => lower.includes(term)).length;
+  const displayEvaluation = evaluateDisplayEvent(event);
 
-  return hits * 35 + (isPageFurniture(event.excerpt ?? '') ? 120 : 0);
+  return (
+    hits * 35 +
+    (isPageFurniture(event.excerpt ?? '') ? 120 : 0) +
+    (displayEvaluation.displayQuality === 'low' ? 180 : 0)
+  );
 }
 
 function incidentBonus(event: StoredHazmatEvent): number {
