@@ -98,6 +98,16 @@ const REPO_URL = 'https://github.com/CodeByDerrick/garden-grove-May2026-hazmat-c
 const jsonHeaders = {
   'content-type': 'application/json; charset=utf-8',
   'cache-control': 'no-store',
+  'access-control-allow-origin': '*',
+  'access-control-allow-methods': 'GET, POST, OPTIONS',
+  'access-control-allow-headers': 'Content-Type',
+};
+
+const corsPreflightHeaders = {
+  'access-control-allow-origin': '*',
+  'access-control-allow-methods': 'GET, POST, OPTIONS',
+  'access-control-allow-headers': 'Content-Type',
+  'access-control-max-age': '86400',
 };
 
 function errorMessage(error: unknown): string {
@@ -266,6 +276,13 @@ async function getEvents(env: WorkerEnv, includeLowQuality = false): Promise<Haz
 export default {
   async fetch(request: Request, env: WorkerEnv & OpsEnv): Promise<Response> {
     const url = new URL(request.url);
+
+    if (request.method === 'OPTIONS') {
+      return new Response(null, {
+        status: 204,
+        headers: corsPreflightHeaders,
+      });
+    }
 
     // TODO: add request-wide public_api_requests and non-poll d1_reads counters
     // before scaling public API traffic. Manual poll fetch/read/write counters are wired.

@@ -44,6 +44,28 @@ npm install
 npm run dev
 ```
 
+### Local Worker dashboard test
+
+The production dashboard still uses the Apps Script endpoint. To test the Vite dashboard against the local Cloudflare Worker without changing production behavior, create a local-only file:
+
+```text
+VITE_STATUS_ENDPOINT=http://localhost:8787/api/status
+```
+
+Save it as `.env.local`. This file is ignored by git.
+
+Then run two terminals:
+
+```bash
+npm run worker:dev
+```
+
+```bash
+npm run dev
+```
+
+Open the Vite localhost URL and check the browser console for the `[dashboard] status endpoint:` line. It should show `http://localhost:8787/api/status` when `.env.local` is present. Remove `.env.local` to return local development to the default Apps Script endpoint.
+
 ## Build
 
 ```bash
@@ -64,4 +86,4 @@ The dashboard reads from:
 VITE_STATUS_ENDPOINT=https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec
 ```
 
-For emergency fallback, the dashboard includes mock data when no endpoint is configured.
+If `VITE_STATUS_ENDPOINT` is not set, the dashboard uses the current Apps Script endpoint by default. `.env.example` shows the Worker endpoint shape for future deployment configuration.
