@@ -132,6 +132,8 @@ Scheduled polling remains intentionally disabled until source failures, parser q
 
 The `newestEvents` field in `GET /api/status` uses the same display-ready event filter before status-specific ranking, so the dashboard status payload does not surface raw stored page-furniture rows by default.
 
+Official-source display excerpts are also cleaned for common CMS chrome such as skip links, accessibility/menu labels, custom search text, language fragments, and government navigation blocks. Raw stored excerpts remain available through `GET /api/events?includeLowQuality=true` for operator/debug review.
+
 Use the raw debug view only while inspecting parser quality:
 
 ```powershell
@@ -146,6 +148,15 @@ $raw = Invoke-RestMethod "http://localhost:8787/api/events?includeLowQuality=tru
 $filtered.Count
 $raw.Count
 ```
+
+Verify the display-layer cleanup with the Worker already running:
+
+```powershell
+npm run worker:dev
+npm run worker:verify-display-cleanup
+```
+
+The verification fetches `/api/events`, `/api/status`, and `/api/events?includeLowQuality=true`. It checks that default official-source display excerpts do not contain CMS furniture such as skip links, accessibility/menu labels, government navigation, media kit labels, or language fragments; that a Garden Grove official incident excerpt still contains incident text; and that raw/debug access remains available. This script does not test parser or storage behavior and does not mutate D1.
 
 ## Parser Smoke Test
 

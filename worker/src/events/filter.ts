@@ -91,6 +91,38 @@ const OPERATIONAL_EVACUATION_PATTERNS = [
   /\bWestern Ave\b/i,
 ];
 
+const OFFICIAL_INCIDENT_START_PATTERNS = [
+  /\bGARDEN GROVE HAZMAT INCIDENT\b/i,
+  /\bEmergency crews are responding\b/i,
+  /\bEvacuation Order\b/i,
+  /\bchemical spill\b/i,
+  /\bcooling operation\b/i,
+  /\bproduct removal\b/i,
+  /\bpressure\b/i,
+  /\bvapor release\b/i,
+  /\bmethyl methacrylate\b/i,
+  /\bhazardous chemical\b/i,
+];
+
+const OFFICIAL_CMS_FURNITURE_PATTERNS = [
+  /\bSkip to main content\b/gi,
+  /\bAccessibility Help\b/gi,
+  /\bMenu Open\b/gi,
+  /\bMenu Close\b/gi,
+  /\bContent block block-[a-z0-9-]+\b/gi,
+  /\bCustom Google Search Submit\b/gi,
+  /\bGovernment Residents Businesses Public Safety News Media Kit\b/gi,
+  /\bResidents Businesses Public Safety News Media Kit\b/gi,
+  /\bSearch Submit\b/gi,
+  /\bSelect Language\b/gi,
+  /\bPowered by Google Translate\b/gi,
+  /\bTranslate\b/gi,
+  /\bEnglish\s+Espa(?:ñ|&#\d+;)ol\s+Ti(?:ếng|&#\d+;ng)\s+Vi(?:ệt|&#\d+;t)\s+(?:(?:&#\d+;)+\s*)+/gi,
+  /\bEnglish Español Tiếng Việt 한국어 中文\b/gi,
+  /\bEspañol Tiếng Việt 한국어 中文\b/gi,
+  /\bFacebook Twitter Instagram YouTube LinkedIn\b/gi,
+];
+
 function normalizedText(text: string): string {
   return String(text || '').replace(/\s+/g, ' ').trim();
 }
@@ -123,6 +155,17 @@ function hasPhysicalBodyEvidence(event: FilterableEvent, eventText: string): boo
   return PHYSICAL_CATEGORIES.has(event.category) && PHYSICAL_EVIDENCE_PATTERNS.some((pattern) => pattern.test(eventText));
 }
 
+function meaningfulIncidentStartIndex(text: string): number | undefined {
+  const indexes = OFFICIAL_INCIDENT_START_PATTERNS.flatMap((pattern) => {
+    const match = pattern.exec(text);
+    return match?.index === undefined ? [] : [match.index];
+  });
+
+  if (indexes.length === 0) return undefined;
+
+  return Math.min(...indexes);
+}
+
 export function cleanDisplayText(text: string): string {
   return normalizedText(text)
     .replace(/\s*this live blog has ended\.?\s*/gi, ' ')
@@ -130,11 +173,37 @@ export function cleanDisplayText(text: string): string {
     .trim();
 }
 
+export function cleanOfficialDisplayExcerpt(text: string): string {
+  let cleaned = cleanDisplayText(text);
+
+  for (const pattern of OFFICIAL_CMS_FURNITURE_PATTERNS) {
+    cleaned = cleaned.replace(pattern, ' ');
+  }
+
+  cleaned = cleaned
+    .replace(/\b(?:Language|Languages)\s+(?:English\s*)?/gi, ' ')
+    .replace(/\s*[|/\\]\s*/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const startIndex = meaningfulIncidentStartIndex(cleaned);
+  if (startIndex !== undefined && startIndex > 0) {
+    cleaned = cleaned.slice(startIndex).trim();
+  }
+
+  return cleaned.replace(/^[\s:;,.|-]+/, '').replace(/\s+/g, ' ').trim();
+}
+
 export function toDisplayEvent<T extends FilterableEvent>(event: T): T {
   return {
     ...event,
     summary: cleanDisplayText(event.summary),
-    excerpt: event.excerpt ? cleanDisplayText(event.excerpt) : event.excerpt,
+    excerpt:
+      event.excerpt && event.sourceTier === 'official'
+        ? cleanOfficialDisplayExcerpt(event.excerpt)
+        : event.excerpt
+          ? cleanDisplayText(event.excerpt)
+          : event.excerpt,
   };
 }
 
