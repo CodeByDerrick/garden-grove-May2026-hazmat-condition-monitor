@@ -1,6 +1,8 @@
 # Hazmat Condition Monitor Worker
 
-Cloudflare Worker scaffold for the Garden Grove hazmat condition monitor backend migration.
+> **Status: preserved prototype only.** The Garden Grove event has concluded. This Worker was never the production incident backend and is not authorized for deployment. A future emergency-response project should start fresh and selectively reuse only lessons or independently revalidated components.
+
+Cloudflare Worker scaffold preserved from the Garden Grove hazmat condition monitor backend exploration.
 
 This slice serves mock JSON and includes the first D1 storage scaffold. It does not poll live sources, replace the Apps Script endpoint, or change the existing dashboard data flow.
 
@@ -196,7 +198,9 @@ $body = @{
 Invoke-RestMethod -Method Post http://localhost:8787/api/parser/smoke -ContentType "application/json" -Body $body
 ```
 
-## Deploy
+## Historical deployment procedure
+
+Retained for implementation reference only. Do not deploy this concluded-event prototype as a current emergency service.
 
 ```sh
 npm run worker:deploy

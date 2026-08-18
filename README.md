@@ -1,8 +1,12 @@
 # Garden Grove May 2026 Hazmat Condition Monitor
 
-Mobile-first public-source monitor for the Garden Grove May 2026 hazmat incident.
+> **Project status: concluded-event prototype and reference.** The May 2026 event is over. This repository is not an active emergency monitor, production service, or starting point that should be redeployed for a later incident. A future emergency-response system should be created from the ground up for its current event and may use the documented lessons and prototype components here as reference only.
 
-This project is an emergency MVP designed to run from browser/mobile-accessible tools:
+See [`docs/prototype-closeout-and-reference-boundary.md`](docs/prototype-closeout-and-reference-boundary.md) for the durable reuse boundary.
+
+This repository preserves a mobile-first public-source monitoring prototype created for the Garden Grove May 2026 hazmat incident.
+
+The prototype was designed to run from browser/mobile-accessible tools:
 
 - **Dashboard:** Vite + React + TypeScript static site hosted by GitHub Pages.
 - **Poller:** Google Apps Script fetches public sources, writes deduplicated events to Google Sheets, and exposes JSON through a web app endpoint.
@@ -10,7 +14,9 @@ This project is an emergency MVP designed to run from browser/mobile-accessible 
 
 > This monitor tracks public-source updates. It is not direct tank telemetry and does not replace official emergency instructions.
 
-## MVP workflow
+## Historical MVP workflow
+
+The following records how the prototype was intended to operate. It is not a current deployment instruction or authorization.
 
 1. Deploy the dashboard through GitHub Pages.
 2. Create a Google Sheet for the incident event log.
@@ -72,7 +78,9 @@ Open the Vite localhost URL and check the browser console for the `[dashboard] s
 npm run build
 ```
 
-## GitHub Pages
+## Historical GitHub Pages deployment
+
+This section is retained as implementation reference. The concluded-event prototype should not be treated as an active emergency information service.
 
 The included workflow builds the static dashboard and publishes `dist/` to GitHub Pages.
 
