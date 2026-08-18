@@ -1,5 +1,10 @@
 node_modules/
 dist/
+*.tsbuildinfo
 .env
 .env.local
 .DS_Store
+
+# Cloudflare Wrangler local state
+.wrangler/
+worker/.wrangler/

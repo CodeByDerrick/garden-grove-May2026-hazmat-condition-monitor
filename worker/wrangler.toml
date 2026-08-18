@@ -1,0 +1,14 @@
+name = "hazmat-condition-monitor-worker"
+main = "src/index.ts"
+compatibility_date = "2026-05-24"
+
+[observability]
+enabled = true
+
+[[d1_databases]]
+binding = "DB"
+# Replace these placeholder values after running:
+#   npx wrangler d1 create hazmat-condition-monitor
+database_name = "hazmat-condition-monitor"
+database_id = "edcf8894-5266-46e7-92f3-4f549c7f8f43"
+migrations_dir = "migrations"
